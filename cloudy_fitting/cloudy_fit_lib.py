@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.integrate import simpson
+from scipy import integrate, interpolate
 from astropy import constants
 import matplotlib.pyplot as plt
 
@@ -47,28 +47,29 @@ IP_dict = {'HI': 0,
             'OVI': 113.9,
             'NeVIII': 207.26}
 
+# This is to convert ions from VP fit into species for the CLOUDY interpolated grid
 ion_species_dict  = {'HI': '#column density H',
-    'MgII': 'Mg+',
-    'FeII': 'Fe+',
-    'SiII': 'Si+',
-    'CII': 'C+',
-    'OII': 'O+',
-    'NII': 'N+',
-    'SiIII': 'Si+2',
-    'AlIII': 'Al+2',
-    'CIII': 'C+2',
-    'NIII': 'N+2',
-    'SiIV': 'Si+3',
-    'SIV': 'S+3',
-    'OIII': 'O+2',
-    'SV': 'S+4',
-    'NIV': 'N+3',
-    'CIV': 'C+3',
-    'OIV': 'O+3',
-    'SVI': 'S+5',
-    'NV': 'N+4',
-    'OVI': 'O+5',
-    'NeVIII': 'Ne+7'}
+                    'MgII': 'Mg+',
+                    'FeII': 'Fe+',
+                    'SiII': 'Si+',
+                    'CII': 'C+',
+                    'OII': 'O+',
+                    'NII': 'N+',
+                    'SiIII': 'Si+2',
+                    'AlIII': 'Al+2',
+                    'CIII': 'C+2',
+                    'NIII': 'N+2',
+                    'SiIV': 'Si+3',
+                    'SIV': 'S+3',
+                    'OIII': 'O+2',
+                    'SV': 'S+4',
+                    'NIV': 'N+3',
+                    'CIV': 'C+3',
+                    'OIV': 'O+3',
+                    'SVI': 'S+5',
+                    'NV': 'N+4',
+                    'OVI': 'O+5',
+                    'NeVIII': 'Ne+7'}
 
 # Number densities of various elements in the Sun relative to hydrogen
 solar_rel_dens_dict = {'Hydrogen': 1.0,
@@ -237,7 +238,7 @@ def calc_ionizing_flux(uvb_wav_grid, uvb_J_nu):
     
     # Calculate the ionizing flux of photons >= 1 Ryd, units are photon/s/cm^2
     # Need to flip b/c frequency array is decreasing
-    phi = simpson(y=np.flip(uvb_phot_dens_nu[ion_idx]), x=np.flip(uvb_nu_grid[ion_idx]))
+    phi = integrate.simpson(y=np.flip(uvb_phot_dens_nu[ion_idx]), x=np.flip(uvb_nu_grid[ion_idx]))
     
     return phi
 
@@ -376,7 +377,7 @@ def get_metal_abundance(O_H, M_O_dict = {}):
     for i in range(len(solar_rel_dens_dict)):
 
         # Isolate elements present in the Sun
-        element = list(solar_rel_dens_dict.keys())
+        element = list(solar_rel_dens_dict.keys())[i]
 
         # Exclude H and He (b/c they aren't metals) and oxygen b/c it's already been accounted for 
         if element != 'Hydrogen' and element != 'Helium' and element != 'Oxygen':
@@ -554,7 +555,120 @@ def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, s
         ion = ions_ordered[i]   
         s = ion_species_dict[ion]
 
+        # Get predicted column density for the species from CLOUDY
+        logN_s = species_logN_interp[s]([logN_HI_test, log_hdens_test, log_metals_test])[0]
+
+        # If there is departure from solar abundance, shift the predicted column density accordingly
+        # s.split('+')[0] is supposed to be the element name. This won't work for hydrogen, or helium, but they're not metals anyway
+        if s.split('+')[0] in M_O_dict:
+            logN_s += M_O_dict[s.split('+')[0]]
+
         # Get interpolated column density from CLOUDY grid
-        logN_species_test.append(species_logN_interp[s]([logN_HI_test, log_hdens_test, log_metals_test])[0])
+        logN_species_test.append(logN_s)
 
     return logN_species_test
+
+###################################################################################
+#### Utilities for constraining HI column density, gas density, and abundances ####
+###################################################################################
+
+def log_prior(params):
+    
+    '''
+    Priors for an MCMC search. 
+
+    params_dict: Dictionary of parameters being fitted. Will contain logN_HI, n_H, [O/H], and [X/H]
+    '''
+
+    # Grid parameters being varied
+    logN_HI, log_hdens, O_H, M_O_dict = params
+
+    # First generate the metal abundance using [O/H] and [X/H]
+    log_metals = get_metal_abundance(O_H=O_H, M_O_dict=M_O_dict)
+    
+    # If the sampled density is within the CLOUDY limits
+    # Avoid edges?
+    if logN_HI_min<logN_HI<logN_HI_max and log_hdens_min<log_hdens<log_hdens_max and log_metals_min<log_metals<log_metals_max:
+        return 0.0
+    return -np.inf
+
+def log_likelihood(params, logN_dict, species_logN_interp):
+
+    '''
+    Likelihood function for comparing CLOUDY predicted column densities to the observed values from VP fit.
+    If only some of the parameters need to be fit, the log_likelihood function can be overridden with a lambda function
+    which calls this likelihood function with only some parameters being varied.
+
+    params: parameters needed to generate CLOUDY predicted column densities
+    logN_dict: dictionary of measured column densities from VP fit
+    species_logN_interp: interpolated CLOUDY grid
+    '''
+    
+    # Grid parameters being varied
+    logN_HI, log_hdens, O_H, M_O_dict = params
+
+    # Generate metal abundance using [O/H] and [M/O]
+    log_metals = get_metal_abundance(O_H=O_H, M_O_dict=M_O_dict)
+    
+    # Likelihood function
+    ll = 0
+    
+    ions = list(logN_dict.keys())
+    
+    # Ignore first entry since it's HI
+    for i in range(len(ions)):
+        
+        # This is from VP fit
+        ion = ions[i]
+        logN_str = logN_dict[ion]
+        
+        # This is from CLOUDY
+        s = ion_species_dict[ion]
+        
+        # Get interpolated column density from CLOUDY grid
+        y_bar = species_logN_interp[s]([logN_HI, log_hdens, log_metals])[0]
+
+        # If there is departure from solar abundance, shift the predicted column density accordingly
+        if s.split('+')[0] in M_O_dict:
+            y_bar += M_O_dict[s.split('+')[0]]
+        
+        # Based on detection or non-detection, compute the likelihood term
+        
+        # Detection
+        if logN_str[0] != '<' and logN_str[0] != '>':
+            
+            logN_arr = np.array(logN_str.split(','), dtype=float)
+            
+            # Observed column density
+            y = logN_arr[0]
+            # Use max of lower and upper error for defining Gaussian distribution of column density
+            sig_y = max(-logN_arr[1], logN_arr[2])
+            # Gaussian likelihood
+            ll += -.5*(y-y_bar)**2/sig_y**2
+
+        # Upper limit
+        elif logN_str[0] == '<':
+            
+            # Upper limit of column density
+            # This is 3-sigma
+            y = float(logN_str[1:])
+            
+            # Uncertainty in column density
+            # This is 1-sigma
+            sig_y = y-np.log10(3)
+            
+            # Define an integration range for the reported value, from "-inf" to upper limit
+            # Use a step size of 0.1 dex
+            y_range = np.arange(-10, y+0.05, 0.05)
+            
+            # Confusing notation :(
+            # CDF
+            ll += np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/sig_y**2)))
+            
+        # Lower limit
+        # NOTE: not implemented yet
+        elif logN_str[0] == '>':
+            pass      
+        
+    # Return log likelihood for MCMC
+    return ll

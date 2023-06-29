@@ -472,19 +472,6 @@ class ion_transition:
         err_abs = self.err_norm[idx][:-1]
 
         delta_lambda = np.mean(((v_abs[1:]-v_abs[:-1])*self.wav0_rest/3e+5)*1e+3) # in mA
-        
-        # For each mask
-        #for i in range(len(self.masks)):
-
-        #    v_mask = self.masks[i]
-
-            # Get boolean indices corresponding to mask
-        #    mask = ((v_abs<v_mask[0])|(v_abs>v_mask[1]))
-
-            # Update velocities, fluxes, and errors
-        #    v_abs = v_abs[mask]
-        #    flux_abs = flux_abs[mask]
-        #    err_abs = err_abs[mask]
 
         EW = np.sum((1-flux_abs[:-1])*delta_lambda)
         EW_1sig = np.sqrt(np.sum((err_abs[:-1]*delta_lambda)**2))
