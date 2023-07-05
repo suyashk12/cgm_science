@@ -24,7 +24,10 @@ log_metals_max = 1
 
 # Dictionary of ionization potentials (in eV) of CREATION, not destruction
 # 13.6 eV is for destruction, assume HI to be present from big bang nucleosynthesis
-IP_dict = {'HI': 0,
+# Similarly, assume HeI to be present already too
+IP_dict = {'HI': -1.,
+            'HeI': 0., 
+            'AlII': 5.986,
             'MgII': 7.646,
             'FeII': 7.87,
             'SiII': 8.151,
@@ -45,10 +48,14 @@ IP_dict = {'HI': 0,
             'SVI': 72.68,
             'NV': 77.472,
             'OVI': 113.9,
-            'NeVIII': 207.26}
+            'NeVI': 126.21,
+            'NeVIII': 207.26,
+            'MgX': 328.0}
 
 # This is to convert ions from VP fit into species for the CLOUDY interpolated grid
 ion_species_dict  = {'HI': '#column density H',
+                     'HeI': 'He',
+                     'AlII': 'Al+',
                     'MgII': 'Mg+',
                     'FeII': 'Fe+',
                     'SiII': 'Si+',
@@ -69,7 +76,9 @@ ion_species_dict  = {'HI': '#column density H',
                     'SVI': 'S+5',
                     'NV': 'N+4',
                     'OVI': 'O+5',
-                    'NeVIII': 'Ne+7'}
+                    'NeVI': 'Ne+5',
+                    'NeVIII': 'Ne+7',
+                    'MgX': 'Mg+9'}
 
 # Number densities of various elements in the Sun relative to hydrogen
 solar_rel_dens_dict = {'Hydrogen': 1.0,
@@ -389,10 +398,11 @@ def get_metal_abundance(O_H, M_O_dict = {}):
             n_M_O = solar_rel_dens_dict[element]/solar_rel_dens_dict['Oxygen']
 
             # Check if a relative abundance is provided for this element
-            if element in list(M_O_dict.keys()):
+            # NOTE: For convenience, we'll be using short forms of elements in M_O_dict
+            if element_names_dict[element] in list(M_O_dict.keys()):
                 # If present, correct the relative density compared to solar
                 # Again, remember that relative abundances are on a log scale
-                n_M_O *= 10**M_O_dict[element]
+                n_M_O *= 10**M_O_dict[element_names_dict[element]]
 
             # Convert the relative density of metal to oxygen into metal to hydrogen
             n_M_H += n_M_O*n_O_H
@@ -437,10 +447,11 @@ def get_alpha_abundance(O_H, alpha_O_dict = {}):
             n_alpha_O = solar_rel_dens_dict[element]/solar_rel_dens_dict['Oxygen']
 
             # Check if a relative abundance is provided for this element
-            if element in list(alpha_O_dict.keys()):
+            # NOTE: For convenience, we'll be using short forms of elements in alpha_O_dict
+            if element_names_dict[element] in list(alpha_O_dict.keys()):
                 # If present, correct the relative density compared to solar
                 # Again, remember that relative abundances are on a log scale
-                n_alpha_O *= 10**alpha_O_dict[element]
+                n_alpha_O *= 10**alpha_O_dict[element_names_dict[element]]
 
             # Convert the relative density of metal to oxygen into metal to hydrogen
             n_alpha_H += n_alpha_O*n_O_H
@@ -521,7 +532,9 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None):
         # Lower limit
         # Not implemented yet
         elif logN_str[0] == '>':
-            pass
+            logN_arr = np.array(logN_str[1:].split(','), dtype=float)
+            ax.errorbar(x=i, y=logN_arr[0], yerr=0.3, lolims=True, color='black', fmt='o', markersize=3)
+            ax.text(x=i-.2, y=logN_arr[0]-.85, s=ion)
 
     # Turn off ticks and label axes
     ax.set_xticks([])
@@ -631,7 +644,7 @@ def log_likelihood(params, logN_dict, species_logN_interp):
         # If there is departure from solar abundance, shift the predicted column density accordingly
         if s.split('+')[0] in M_O_dict:
             y_bar += M_O_dict[s.split('+')[0]]
-        
+
         # Based on detection or non-detection, compute the likelihood term
         
         # Detection
@@ -641,8 +654,10 @@ def log_likelihood(params, logN_dict, species_logN_interp):
             
             # Observed column density
             y = logN_arr[0]
+
             # Use max of lower and upper error for defining Gaussian distribution of column density
             sig_y = max(-logN_arr[1], logN_arr[2])
+
             # Gaussian likelihood
             ll += -.5*(y-y_bar)**2/sig_y**2
 
@@ -653,22 +668,40 @@ def log_likelihood(params, logN_dict, species_logN_interp):
             # This is 3-sigma
             y = float(logN_str[1:])
             
-            # Uncertainty in column density
-            # This is 1-sigma
-            sig_y = y-np.log10(3)
-            
             # Define an integration range for the reported value, from "-inf" to upper limit
             # Use a step size of 0.1 dex
-            y_range = np.arange(-10, y+0.05, 0.05)
-            
+            y_range_min = -10
+            y_range_step = 0.05
+
+            y_range = np.arange(y_range_min, y+y_range_step, y_range_step)
+            # Get the range in linear space
+            lin_y_range = 10**y_range
+
+            # The uncertainty on log scale is proportional to the fractional error in the linear scale
+            sig_lin_y = 10**y/3
+
             # Confusing notation :(
-            # CDF
-            ll += np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/sig_y**2)))
+            # CDF - marginalize over the reported value
+            # Use 10^y_bar, not y_bar! Comparison for upper limits takes place in the linear scale
+            ll += np.log(integrate.simpson(x=lin_y_range, y=np.exp(-.5*(lin_y_range-10**y_bar)**2/sig_lin_y**2)))
             
         # Lower limit
         # NOTE: not implemented yet
         elif logN_str[0] == '>':
-            pass      
-        
+
+            logN_arr = np.array(logN_str[1:].split(','), dtype=float)
+
+            # Isolate the lower limit and sigma
+            y = logN_arr[0]
+            sig_y = logN_arr[1]
+
+            y_range_max = 21.5 # Should extend to infinity, ideally
+            y_range_step = 0.05
+
+            y_range = np.arange(y, y_range_max+y_range_step, y_range_step)
+
+            # "Q"-function, marginalize over reported values
+            ll += np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/sig_y**2)))
+
     # Return log likelihood for MCMC
     return ll
