@@ -53,6 +53,12 @@ A_dict = {'H' : 1.00797 ,
 'Zn' : 65.38,
 }
 
+# Significance levels
+# Sigma values taken from Gehrels 1986
+cdf_1sig = 0.8413
+cdf_2sig = 0.9772
+cdf_3sig = 0.9987
+
 # List of instruments
 
 # Base reference: HIRES MW Ca H&K
@@ -454,36 +460,125 @@ class ion_transition:
 
         logT_dist = ion_suite.result_emcee.flatchain[logT_name]
         b_NT_dist = ion_suite.result_emcee.flatchain[b_NT_name]
+        b_T_dist = np.sqrt(2*k_B*10**logT_dist/(self.A*amu))
         b_dist = np.sqrt(2*k_B*10**logT_dist/(self.A*amu) + b_NT_dist**2)
 
+        self.b_T_dist = b_T_dist
         self.b_dist = b_dist
 
-    def get_EW(self, b, v_c):
+        print('b_T, 1sig: {:.1f}, {:.1f}, +{:.1f}'.format(np.median(self.b_T_dist), 
+                                                       np.percentile(self.b_T_dist, 100*(1-cdf_1sig))-np.median(self.b_T_dist), 
+                                                       np.percentile(self.b_T_dist, 100*(cdf_1sig))-np.median(self.b_T_dist)))
+        
+        print('b_T, 3sig: <{:.1f}'.format(np.percentile(self.b_T_dist, 100*cdf_3sig)))
+
+        print('b, 1sig: {:.1f}, {:.1f}, +{:.1f}'.format(np.median(self.b_dist), 
+                                                       np.percentile(self.b_dist, 100*(1-cdf_1sig))-np.median(self.b_dist), 
+                                                       np.percentile(self.b_dist, 100*(cdf_1sig))-np.median(self.b_dist)))
+
+    def gen_conv_fwhm(self, b, logN_ref):
+
+        # Generate a finely sampled convolved profile
+        v_mod = np.linspace(self.v[0], self.v[-1], 10*len(self.v))
+
+        model_flux_conv = comp_model_spec_gen(v_mod, np.array([[logN_ref, b, 0]]), 
+                                        self.wav0_rest, self.f, self.gamma, self.A,
+                                        True,
+                                        self.lsf, self.v_lsf)[1]
+        
+        # Convert it back to optical depth
+        model_tau_conv = -np.log(model_flux_conv)
+
+        # Get tau for FWHM
+        tau_fwhm_conv = 0.5*np.max(model_tau_conv)
+
+        # Compute FWHM
+        tau_2_v = interpolate.interp1d(x=model_tau_conv[v_mod>0], y=v_mod[v_mod>0], fill_value='extrapolate')
+        fwhm_conv = 2*tau_2_v([tau_fwhm_conv])[0]
+
+        return fwhm_conv
+    
+    def gen_inv_curve_of_growth(self, b, logN_min = 9, logN_max = 18, logN_step=0.01):
+
+        '''
+        Generates (inverse of) curve of growth for the ion transition to generate column density given an equivalent width
+        '''
+
+        # Create a grid of logN
+        logN_grid = np.arange(logN_min, logN_max+logN_step, logN_step)
+
+        # Get the wavelength pixel size in milli-Angstrom
+        delta_lambda = np.mean(((self.v[1:]-self.v[:-1])*self.wav0_rest/3e+5)*1e+3) # in mA
+
+        # Generate a grid of models, and for each of them evaluate the equivalent width
+        EW_grid = np.zeros(len(logN_grid))
+
+        for i in range(len(logN_grid)):
+
+            # Generate a convolved model profile
+            model = comp_model_spec_gen(self.v, np.array([[logN_grid[i], b, 0]]), 
+                                        self.wav0_rest, self.f, self.gamma, self.A,
+                                        True,
+                                        self.lsf, self.v_lsf)[1]
+            EW_grid[i] = np.sum((1-model[:-1])*delta_lambda)
+
+        EW_2_logN = interpolate.interp1d(x=EW_grid, y=logN_grid, fill_value='extrapolate')
+    
+        return EW_2_logN
+
+    def get_EW(self, b, v_c, logN_ref=13.):
 
         '''
         Method to get EW, 1-sigma upper limit on EW
         '''
 
-        fwhm = 2*np.sqrt(np.log(2))*b
-        idx = (self.v>v_c-fwhm)&(self.v<v_c+fwhm)
+        fwhm = self.gen_conv_fwhm(b, logN_ref)
 
-        v_abs = self.v[idx][:-1]
+        idx = (self.v>v_c-fwhm)&(self.v<v_c+fwhm)
+        
+        v_abs = self.v[idx]
         flux_abs = self.flux_norm[idx][:-1]
         err_abs = self.err_norm[idx][:-1]
 
+        # This is a safeguard against a 2-element v_abs
         delta_lambda = np.mean(((v_abs[1:]-v_abs[:-1])*self.wav0_rest/3e+5)*1e+3) # in mA
 
-        EW = np.sum((1-flux_abs[:-1])*delta_lambda)
-        EW_1sig = np.sqrt(np.sum((err_abs[:-1]*delta_lambda)**2))
+        EW = np.sum((1-flux_abs)*delta_lambda)
+        EW_1sig = np.sqrt(np.sum((err_abs*delta_lambda)**2))
 
         self.EW = EW
         self.EW_1sig = EW_1sig
 
         # Convert to 1-sigma and 3-sigma errors in N
-        self.N_1sig = (EW_1sig*1e-3/self.wav0_rest)*(3e+8/(self.wav0_rest*1e-10))*(2.654e-2*self.f)**-1
-        self.logN_1sig = np.log10(self.N_1sig)
-        self.logN_3sig = np.log10(3*self.N_1sig)
+        #self.N_1sig = (EW_1sig*1e-3/self.wav0_rest)*(3e+8/(self.wav0_rest*1e-10))*(2.654e-2*self.f)**-1
+        #self.logN_1sig = np.log10(self.N_1sig)
+        
+        # Compute 3-sigma limit of logN using inverse curve of growth
+        self.COG = self.gen_inv_curve_of_growth(b)
+        self.logN_3sig = self.COG([3*self.EW_1sig])[0]
 
+        # Print EW, 1-sigma error, 3-sigma error, and 3-sigma upper limit in logN
+        print('Integration window: ' + '[{}, {}]'.format(int(np.round(v_c-fwhm)), int(np.round(v_c+fwhm))))
+        print('EW, 1sig: {}, {}'.format(int(np.round(self.EW)), int(np.round(self.EW_1sig))))
+        print('EW-3sig: {}'.format(int(np.round(3*self.EW_1sig))))
+        print('logN-3sig: {:.1f}'.format(np.round(self.logN_3sig,1)))
+
+    def get_EW_total(self, v_min, v_max):
+
+        idx = (self.v>v_min)&(self.v<v_max)
+
+        v_abs = self.v[idx]
+        flux_abs = self.flux_norm[idx][:-1]
+        err_abs = self.err_norm[idx][:-1]
+
+        delta_lambda = np.mean(((v_abs[1:]-v_abs[:-1])*self.wav0_rest/3e+5)*1e+3) # in mA
+
+        EW = np.sum((1-flux_abs)*delta_lambda)
+        EW_1sig = np.sqrt(np.sum((err_abs*delta_lambda)**2))
+
+        print('Integration window: ' + '[{}, {}]'.format(int(np.round(v_min)), int(np.round(v_max))))
+        print('EW, 1sig: {}, {}'.format(int(np.round(EW)), int(np.round(EW_1sig))))
+        print('EW-3sig: {}'.format(int(np.round(3*EW_1sig))))
 
     def init_ion_transition(self, init_values, lsf_convolve = True):
 
@@ -1379,10 +1474,10 @@ class ion(ion_transition):
             
             flat_sample = self.result_emcee.flatchain[self.result_emcee.var_names[i]]
             self.param_medians.append(np.median(flat_sample))
-            self.param_errs_lo.append(self.param_medians[i]-np.percentile(flat_sample, 16))
-            self.param_errs_hi.append(np.percentile(flat_sample, 84)-self.param_medians[i])
-            self.param_lower_lims.append(np.percentile(flat_sample, 5))
-            self.param_upper_lims.append(np.percentile(flat_sample, 95))
+            self.param_errs_lo.append(self.param_medians[i]-np.percentile(flat_sample, 100*(1-cdf_1sig)))
+            self.param_errs_hi.append(np.percentile(flat_sample, 100*cdf_1sig)-self.param_medians[i])
+            self.param_lower_lims.append(np.percentile(flat_sample, 100*(1-cdf_3sig)))
+            self.param_upper_lims.append(np.percentile(flat_sample, 100*cdf_3sig))
         
         # Also get maximum likelihood estimate
         step_max, walker_max = np.unravel_index(self.result_emcee.lnprob.argmax(), self.result_emcee.lnprob.shape)
@@ -1603,10 +1698,10 @@ class ion(ion_transition):
         if create_fig_ax == True:
             return fig, axes
 
-    def plot_corner(self, loaddir='', quantiles=(0.16,0.5,0.84)):
+    def plot_corner(self, loaddir='', quantiles=(1-cdf_1sig, 0.5, cdf_1sig)):
 
         self.corner_plot = corner.corner(self.result_emcee.flatchain, labels=self.result_emcee.var_names,quantiles=quantiles,
-                                        show_titles=True, plot_density=True, levels=[0.68, 0.95], contour_kwargs={'colors':'red'})
+                                        show_titles=True, plot_density=True, levels=[2*cdf_1sig-1, 2*cdf_2sig-1], contour_kwargs={'colors':'red'})
         
         if loaddir != '':
             plt.savefig(loaddir+'Ions/z={0}/{1}/corner.pdf'.format(self.z, self.name), dpi=300)
@@ -1764,7 +1859,7 @@ class ion_suite(ion):
         if fig is not None and axes is not None:
             return fig, axes
 
-    def plot_corner(self, loaddir='',  quantiles=(0.16,0.5,0.84)):
+    def plot_corner(self, loaddir='',  quantiles=(1-cdf_1sig, 0.5, cdf_1sig)):
 
         super().plot_corner(loaddir=loaddir, quantiles=quantiles)
 
@@ -1991,8 +2086,8 @@ class ion_summary(ion_suite):
                                 b_dist = np.sqrt(2*k_B*10**logT_dist/(ion_transition.A*amu) + b_NT_dist**2)
 
                                 b_mid = np.median(b_dist)
-                                b_err_lo = b_mid - np.percentile(b_dist, 16)
-                                b_err_hi = np.percentile(b_dist, 84) - b_mid
+                                b_err_lo = b_mid - np.percentile(b_dist, 100*(1-cdf_1sig))
+                                b_err_hi = np.percentile(b_dist, 100*cdf_1sig) - b_mid
 
                                 sample_values_reshape.append([sample_values[param_names.index('it{}c{}_logN'.format(i+1, k+1))],
                                                     b_mid,
@@ -2173,6 +2268,7 @@ def model_spec_gen(v_obs, params,
     delta_v_extend = len(lsf)*delta_v_lsf
 
     # Resample the wavelengths with some padding
+    #print(v_shift, delta_v_extend, delta_v_lsf)
     v_mod = np.arange(v_shift[0]-delta_v_extend, v_shift[-1]+delta_v_extend, delta_v_lsf)
     
     # Generate model spectrum

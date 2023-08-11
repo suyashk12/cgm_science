@@ -46,6 +46,7 @@ IP_dict = {'HI': -1.,
             'CIV': 47.887,
             'OIV': 54.934,
             'SVI': 72.68,
+            'OV': 77.413,
             'NV': 77.472,
             'OVI': 113.9,
             'NeVI': 126.21,
@@ -74,6 +75,7 @@ ion_species_dict  = {'HI': '#column density H',
                     'CIV': 'C+3',
                     'OIV': 'O+3',
                     'SVI': 'S+5',
+                    'OV': 'O+4',
                     'NV': 'N+4',
                     'OVI': 'O+5',
                     'NeVI': 'Ne+5',
@@ -358,139 +360,11 @@ def read_col_file(rootdir, filename):
 
     return species_names, log_col_dens
 
-############################################################################
-#### Utilities for dealing with depatures from solar abundance patterns ####
-############################################################################
-
-def get_metal_abundance(O_H, M_O_dict = {}):
-    
-    '''
-    Function to generate [M/H] using [O/H] and [X/O], where X can span other metals.
-    This allows access to the interpolated grid of CLOUDY models
-
-    O_H: [O/H], the relative abundance (to solar) of oxygen to hydrogen
-    M_O_dict: The relative abundances, [M/O] of various metals to oxygen. If a metal is not present in this dictionary, the relative abundance is assumed to be zero.
-    '''
-
-    # First generate the relative density of O to H
-    # Recall that [O/H] is on a log scale
-    # Add it onto the relative metal density to hydrogen
-    n_O_H = solar_rel_dens_dict['Oxygen']*10**O_H
-    n_M_H = n_O_H
-
-    # Meanwhile, also build up the relative metal density in the sun
-    n_M_H_solar = solar_rel_dens_dict['Oxygen']
-
-    # Now generate the other metals (excluding oxygen)
-    
-    for i in range(len(solar_rel_dens_dict)):
-
-        # Isolate elements present in the Sun
-        element = list(solar_rel_dens_dict.keys())[i]
-
-        # Exclude H and He (b/c they aren't metals) and oxygen b/c it's already been accounted for 
-        if element != 'Hydrogen' and element != 'Helium' and element != 'Oxygen':
-
-            # Append to the solar relative metal density
-            n_M_H_solar += solar_rel_dens_dict[element]
-
-            # First get the number density of this element relative to oxygen
-            n_M_O = solar_rel_dens_dict[element]/solar_rel_dens_dict['Oxygen']
-
-            # Check if a relative abundance is provided for this element
-            # NOTE: For convenience, we'll be using short forms of elements in M_O_dict
-            if element_names_dict[element] in list(M_O_dict.keys()):
-                # If present, correct the relative density compared to solar
-                # Again, remember that relative abundances are on a log scale
-                n_M_O *= 10**M_O_dict[element_names_dict[element]]
-
-            # Convert the relative density of metal to oxygen into metal to hydrogen
-            n_M_H += n_M_O*n_O_H
-
-    # Finally, we have the relative abundance of metals
-    M_H =  np.log10(n_M_H)-np.log10(n_M_H_solar)
-
-    return M_H
-
-def get_alpha_abundance(O_H, alpha_O_dict = {}):
-
-    '''
-    Function to get the abundance of alpha elements relative to hydrogen
-
-    O_H: [O/H], the relative abundance (to solar) of oxygen to hydrogen
-    alpha_O_dict: The relative abundances, [alpha/O] of various alpha elements to oxygen.
-    '''
-
-    # First generate the relative density of O to H
-    # Recall that [O/H] is on a log scale
-    # Add it onto the relative metal density to hydrogen
-    n_O_H = solar_rel_dens_dict['Oxygen']*10**O_H
-    n_alpha_H = n_O_H
-
-    # Meanwhile, also build up the relative metal density in the sun
-    n_alpha_H_solar = solar_rel_dens_dict['Oxygen']
-
-    # Now generate the other alpha elements (excluding oxygen)
-    
-    for i in range(len(alpha_elements)):
-
-        # Isolate elements present in the Sun
-        element = alpha_elements[i]
-
-        # Exclude oxygen b/c it's already been accounted for 
-        if element != 'Oxygen':
-
-            # Append to the solar relative metal density
-            n_alpha_H_solar += solar_rel_dens_dict[element]
-
-            # First get the number density of this element relative to oxygen
-            n_alpha_O = solar_rel_dens_dict[element]/solar_rel_dens_dict['Oxygen']
-
-            # Check if a relative abundance is provided for this element
-            # NOTE: For convenience, we'll be using short forms of elements in alpha_O_dict
-            if element_names_dict[element] in list(alpha_O_dict.keys()):
-                # If present, correct the relative density compared to solar
-                # Again, remember that relative abundances are on a log scale
-                n_alpha_O *= 10**alpha_O_dict[element_names_dict[element]]
-
-            # Convert the relative density of metal to oxygen into metal to hydrogen
-            n_alpha_H += n_alpha_O*n_O_H
-
-    # Finally, we have the relative abundance of metals
-    # NOTE: under a solar abundance pattern, [alpha/H] = [O/H]! Important sanity check
-    alpha_H =  np.log10(n_alpha_H)-np.log10(n_alpha_H_solar)
-
-    return alpha_H    
-
-def get_X_alpha(X_O, O_H, alpha_O_dict = {}):
-
-    '''
-    Function to obtain the relative abundance of a non-alpha metal to alpha elements
-
-    X/O: The relative abundance of non-alpha metal X, to O
-    O/H: The relative abundancce of oxygen to hydrogen
-    alpha_O_dict: The relative abundances of other alpha elements to oxygen
-    '''
-
-    # First, get the relative abundance of X to H
-    # You can expand this formula out to see it works :)
-    # Again, under a solar abundance pattern, you can see that X_H = O_H!
-    X_H = X_O + O_H
-
-    # Then get [alpha/H]
-    alpha_H = get_alpha_abundance(O_H, alpha_O_dict)
-
-    # Finally, get [X/alpha]
-    # Again, expand the formula to see it works
-    X_alpha = X_H - alpha_H
-
-    return X_alpha
-
 #################################################
 #### Utilities for plotting column densities ####
 #################################################
 
-def plot_column_densities_obs(logN_dict, fig = None, ax = None):
+def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = []):
 
     '''
     Method to plot observed column densities of species from VP fit
@@ -512,29 +386,34 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None):
     for i in range(len(ions_ordered)):
         
         ion = ions_ordered[i]
+
+        if ion in gray_out:
+            c='darkgray'
+        else:
+            c='black'
         
         logN_str = logN_dict[ion]
         
         # Detection
         if logN_str[0] != '<' and logN_str[0] != '>':
             logN_arr = np.array(logN_str.split(','), dtype=float)
-            ax.scatter(i, logN_arr[0], s=3, color='black')
-            ax.errorbar(x=i, y=logN_arr[0], yerr=logN_arr[1], color='black', linestyle='None',
+            ax.scatter(i, logN_arr[0], s=3, color=c)
+            ax.errorbar(x=i, y=logN_arr[0], yerr=logN_arr[1], color=c, linestyle='None',
                     fmt='o', markersize=3, capsize=4)
-            ax.text(x=i-.2, y=logN_arr[0]+logN_arr[1]+.45, s=ion)
+            ax.text(x=i-.2, y=logN_arr[0]+logN_arr[1]+.45, s=ion, color=c)
         
         # Upper limit
         elif logN_str[0] == '<':
             logN_lim = float(logN_str[1:])
-            ax.errorbar(x=i, y=logN_lim, yerr=0.3, uplims=True, color='black', fmt='o', markersize=3)
-            ax.text(x=i-.2, y=logN_lim+0.3+.15, s=ion)
+            ax.errorbar(x=i, y=logN_lim, yerr=0.3, uplims=True, color=c, fmt='o', markersize=3)
+            ax.text(x=i-.2, y=logN_lim+0.3+.15, s=ion, color=c)
         
         # Lower limit
         # Not implemented yet
         elif logN_str[0] == '>':
             logN_arr = np.array(logN_str[1:].split(','), dtype=float)
-            ax.errorbar(x=i, y=logN_arr[0], yerr=0.3, lolims=True, color='black', fmt='o', markersize=3)
-            ax.text(x=i-.2, y=logN_arr[0]-.85, s=ion)
+            ax.errorbar(x=i, y=logN_arr[0], yerr=0.3, lolims=True, color=c, fmt='o', markersize=3)
+            ax.text(x=i-.2, y=logN_arr[0]-.85, s=ion, color=c)
 
     # Turn off ticks and label axes
     ax.set_xticks([])
@@ -549,7 +428,7 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None):
     if create_fig_ax == True:
         return fig, ax
 
-def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, species_logN_interp, M_O_dict = {}):
+def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, species_logN_interp, X_alpha_dict = {}):
 
     '''
     Predict column densities for an ordered list of ions given an interpolated CLOUDY grid across N_HI, n_H, and [M/H].
@@ -573,8 +452,8 @@ def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, s
 
         # If there is departure from solar abundance, shift the predicted column density accordingly
         # s.split('+')[0] is supposed to be the element name. This won't work for hydrogen, or helium, but they're not metals anyway
-        if s.split('+')[0] in M_O_dict:
-            logN_s += M_O_dict[s.split('+')[0]]
+        if s.split('+')[0] in X_alpha_dict:
+            logN_s += X_alpha_dict[s.split('+')[0]]
 
         # Get interpolated column density from CLOUDY grid
         logN_species_test.append(logN_s)
@@ -594,10 +473,7 @@ def log_prior(params):
     '''
 
     # Grid parameters being varied
-    logN_HI, log_hdens, O_H, M_O_dict = params
-
-    # First generate the metal abundance using [O/H] and [X/H]
-    log_metals = get_metal_abundance(O_H=O_H, M_O_dict=M_O_dict)
+    logN_HI, log_hdens, log_metals, non_solar_dict = params
     
     # If the sampled density is within the CLOUDY limits
     # Avoid edges?
@@ -618,11 +494,8 @@ def log_likelihood(params, logN_dict, species_logN_interp):
     '''
     
     # Grid parameters being varied
-    logN_HI, log_hdens, O_H, M_O_dict = params
+    logN_HI, log_hdens, log_metals, non_solar_dict = params
 
-    # Generate metal abundance using [O/H] and [M/O]
-    log_metals = get_metal_abundance(O_H=O_H, M_O_dict=M_O_dict)
-    
     # Likelihood function
     ll = 0
     
@@ -642,8 +515,8 @@ def log_likelihood(params, logN_dict, species_logN_interp):
         y_bar = species_logN_interp[s]([logN_HI, log_hdens, log_metals])[0]
 
         # If there is departure from solar abundance, shift the predicted column density accordingly
-        if s.split('+')[0] in M_O_dict:
-            y_bar += M_O_dict[s.split('+')[0]]
+        if s.split('+')[0] in non_solar_dict:
+            y_bar += non_solar_dict[s.split('+')[0]]
 
         # Based on detection or non-detection, compute the likelihood term
         
@@ -664,26 +537,19 @@ def log_likelihood(params, logN_dict, species_logN_interp):
         # Upper limit
         elif logN_str[0] == '<':
             
-            # Upper limit of column density
-            # This is 3-sigma
-            y = float(logN_str[1:])
-            
-            # Define an integration range for the reported value, from "-inf" to upper limit
-            # Use a step size of 0.1 dex
-            y_range_min = -10
+            logN_arr = np.array(logN_str[1:].split(','), dtype=float)
+
+            # Isolate the lower limit and sigma
+            y = logN_arr[0]
+            sig_y = logN_arr[1]
+
+            y_range_min = -10 # Should extend to infinity, ideally
             y_range_step = 0.05
 
             y_range = np.arange(y_range_min, y+y_range_step, y_range_step)
-            # Get the range in linear space
-            lin_y_range = 10**y_range
 
-            # The uncertainty on log scale is proportional to the fractional error in the linear scale
-            sig_lin_y = 10**y/3
-
-            # Confusing notation :(
-            # CDF - marginalize over the reported value
-            # Use 10^y_bar, not y_bar! Comparison for upper limits takes place in the linear scale
-            ll += np.log(integrate.simpson(x=lin_y_range, y=np.exp(-.5*(lin_y_range-10**y_bar)**2/sig_lin_y**2)))
+            # CDF, marginalize over reported values
+            ll += np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/sig_y**2)))
             
         # Lower limit
         # NOTE: not implemented yet
