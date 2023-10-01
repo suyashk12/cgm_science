@@ -211,7 +211,7 @@ class ion_transition:
         # Save the masks
         self.masks = masks
 
-    def cont_norm_flux(self, renorm = True, v_abs_range = [-50,50], degree = 1):
+    def cont_norm_flux(self, renorm = True, v_abs_range = [-50,50], degree = 1, manual=[]):
 
         '''
         Method to continuum normalize the flux
@@ -273,8 +273,12 @@ class ion_transition:
             cont_params = list(result.best_values.values())
             cont_flux = np.zeros(len(self.v))
 
-            for i in range(degree+1):
-                cont_flux += cont_params[i]*self.v**i
+            if len(manual)==0:
+                for i in range(degree+1):
+                    cont_flux += cont_params[i]*self.v**i
+            else:
+                for i in range(degree+1):
+                    cont_flux += manual[i]*self.v**i
             
             # Renormalize the normalized flux and error
             self.cont_params = cont_params
@@ -298,7 +302,7 @@ class ion_transition:
         create_fig_ax = False
         if fig == None and axes == None:
             create_fig_ax = True
-            fig, axes = plt.subplots(1, 2, figsize=(14,4), sharex=True)
+            fig, axes = plt.subplots(1, 2, figsize=(14,4))
 
         # First plot the spectrum before renormalization
         axes[0].step(self.v, self.flux, color='black', where='mid', lw=1.5)
@@ -309,6 +313,7 @@ class ion_transition:
             for i in range(len(self.masks)):
                 v_mask = self.masks[i]
                 axes[0].axvspan(v_mask[0], v_mask[1], color='darkgrey')
+                axes[1].axvspan(v_mask[0], v_mask[1], color='darkgrey')
 
         # Draw the continuum boundaries
         if(draw_cont_bounds == True):
@@ -338,13 +343,16 @@ class ion_transition:
             # Create a big subplot
             ax_label = fig.add_subplot(111, frameon=False)
             # hide tick and tick label of the big axes
-            plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+            ax_label.set_xticks([])
+            ax_label.set_yticks([])
 
-            ax_label.set_xlabel('Velocity (km/s)') # Use argument `labelpad` to move label downwards.
-            ax_label.set_ylabel('Flux (continuum normalized)')
+            ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=20) # Use argument `labelpad` to move label downwards.
+            
+            axes[0].set_ylabel('Flux (physical units)')
+            axes[1].set_ylabel('Flux (continuum normalized)')
 
         #plt.tight_layout()
-        plt.subplots_adjust(wspace=0, hspace=0)
+        plt.subplots_adjust(wspace=0.2, hspace=0)
 
         if create_fig_ax == True:
             return fig, axes
@@ -383,11 +391,13 @@ class ion_transition:
         ax.axvline(0, color='brown', linestyle=':')
 
         if(label_axes == True):
-            ax.set_xlabel('Velocity (km/s)')
+            ax.set_xlabel('Relative Velocity (km/s)')
             ax.set_ylabel('Flux (continuum normalized)')
 
-        ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name+ ', ' + self.instrument, fontsize=12)
-        ax.text(self.v[-1]-120, np.max(self.err_norm)+.1, '$\lambda = $' + str(np.round(self.wav0_obs,2)) + 'Å', fontsize=12)
+        ax.text(self.v[0]+30, 0.25, self.name+ ', ' + self.instrument, fontsize=15, weight='bold')
+
+        #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name+ ', ' + self.instrument, fontsize=12)
+        #ax.text(self.v[-1]-120, np.max(self.err_norm)+.1, '$\lambda = $' + str(np.round(self.wav0_obs,2)) + 'Å', fontsize=12)
 
         if create_fig_ax == True:
             return fig, ax
@@ -444,7 +454,7 @@ class ion_transition:
 
         ax.plot(self.v_lsf, self.lsf)
 
-        ax.set_xlabel('Velocity (km/s)')
+        ax.set_xlabel('Relative Velocity (km/s)')
         ax.set_ylabel('LSF')
 
         ax.text(np.min(self.v_lsf)+30, np.min(self.lsf) + .1*(np.max(self.lsf)-np.min(self.lsf)), self.name, fontsize=12)
@@ -497,71 +507,70 @@ class ion_transition:
         fwhm_conv = 2*tau_2_v([tau_fwhm_conv])[0]
 
         return fwhm_conv
-    
-    def gen_inv_curve_of_growth(self, b, logN_min = 9, logN_max = 18, logN_step=0.01):
+
+    def get_upper_lim(self, b, logN_min=0, logN_max=14, logN_ref=12, logN_step=0.1, N_trials=5000):
 
         '''
-        Generates (inverse of) curve of growth for the ion transition to generate column density given an equivalent width
+        Method to get 3-sigma upper limit on column density
         '''
 
-        # Create a grid of logN
+        # Isolate a window within twice the FWHM
+        fwhm = self.gen_conv_fwhm(b, logN_ref)
+        idx = (self.v>-fwhm)&(self.v<fwhm)
+
+        # Run MC trials
         logN_grid = np.arange(logN_min, logN_max+logN_step, logN_step)
 
-        # Get the wavelength pixel size in milli-Angstrom
-        delta_lambda = np.mean(((self.v[1:]-self.v[:-1])*self.wav0_rest/3e+5)*1e+3) # in mA
-
-        # Generate a grid of models, and for each of them evaluate the equivalent width
-        EW_grid = np.zeros(len(logN_grid))
+        # Create pristine spectra
+        model_grid = np.zeros((len(logN_grid), len(self.v)))
 
         for i in range(len(logN_grid)):
-
-            # Generate a convolved model profile
-            model = comp_model_spec_gen(self.v, np.array([[logN_grid[i], b, 0]]), 
-                                        self.wav0_rest, self.f, self.gamma, self.A,
-                                        True,
-                                        self.lsf, self.v_lsf)[1]
-            EW_grid[i] = np.sum((1-model[:-1])*delta_lambda)
-
-        EW_2_logN = interpolate.interp1d(x=EW_grid, y=logN_grid, fill_value='extrapolate')
-    
-        return EW_2_logN
-
-    def get_EW(self, b, v_c, logN_ref=13.):
-
-        '''
-        Method to get EW, 1-sigma upper limit on EW
-        '''
-
-        fwhm = self.gen_conv_fwhm(b, logN_ref)
-
-        idx = (self.v>v_c-fwhm)&(self.v<v_c+fwhm)
+            model_grid[i,:] = comp_model_spec_gen(self.v, np.array([[logN_grid[i], b, 0]]), 
+                                self.wav0_rest, self.f, self.gamma, self.A,
+                                True,
+                                self.lsf, self.v_lsf)[1]
+            
         
-        v_abs = self.v[idx]
-        flux_abs = self.flux_norm[idx][:-1]
-        err_abs = self.err_norm[idx][:-1]
+        # Create noisy spectra
+        noise_grid = np.zeros((N_trials, len(self.v)))
 
-        # This is a safeguard against a 2-element v_abs
-        delta_lambda = np.mean(((v_abs[1:]-v_abs[:-1])*self.wav0_rest/3e+5)*1e+3) # in mA
+        # For each spectral pixel
+        for k in range(len(self.v)):
+            # Generate noise for all logN, for each trial
+            noise_samples = np.random.normal(loc=1, scale=self.err_norm[k], size=N_trials)
+            # Save the reshaped noise in the larger grid
+            noise_grid[:,k] = noise_samples
 
-        EW = np.sum((1-flux_abs)*delta_lambda)
-        EW_1sig = np.sqrt(np.sum((err_abs*delta_lambda)**2))
+        # Evaluate chi-sq
+        chi_sq_grid = np.zeros((N_trials, len(logN_grid)))
 
-        self.EW = EW
-        self.EW_1sig = EW_1sig
+        for i in range(N_trials):
+            for j in range(len(logN_grid)):
+                
+                raw_spec = noise_grid[i,:][idx]
+                model_spec = model_grid[j,:][idx]
+                err_spec = self.err_norm[idx]
+                
+                chi_sq_grid[i,j] = np.sum((raw_spec-model_spec)**2/err_spec**2)
 
-        # Convert to 1-sigma and 3-sigma errors in N
-        #self.N_1sig = (EW_1sig*1e-3/self.wav0_rest)*(3e+8/(self.wav0_rest*1e-10))*(2.654e-2*self.f)**-1
-        #self.logN_1sig = np.log10(self.N_1sig)
-        
-        # Compute 3-sigma limit of logN using inverse curve of growth
-        self.COG = self.gen_inv_curve_of_growth(b)
-        self.logN_3sig = self.COG([3*self.EW_1sig])[0]
+        # Average chi-sq
+        chi_sq_mean = np.mean(chi_sq_grid, axis=0)
 
-        # Print EW, 1-sigma error, 3-sigma error, and 3-sigma upper limit in logN
-        print('Integration window: ' + '[{}, {}]'.format(int(np.round(v_c-fwhm)), int(np.round(v_c+fwhm))))
-        print('EW, 1sig: {}, {}'.format(int(np.round(self.EW)), int(np.round(self.EW_1sig))))
-        print('EW-3sig: {}'.format(int(np.round(3*self.EW_1sig))))
-        print('logN-3sig: {:.1f}'.format(np.round(self.logN_3sig,1)))
+        # Convert to PDF, then CDF
+        pdf = np.exp(-0.5*chi_sq_mean)
+        cdf = np.cumsum(pdf)/np.sum(pdf)
+
+        # Get PPF
+        ppf = interpolate.interp1d(x=cdf, y=10**logN_grid)
+
+        self.logN_1sig = np.round(np.log10(ppf([cdf_1sig])[0]), 1)
+        self.logN_2sig = np.round(np.log10(ppf([cdf_2sig])[0]), 1)
+        self.logN_3sig = np.round(np.log10(ppf([cdf_3sig])[0]), 1)
+
+        # Print 1-sigma, 2-sigma and 3-sigma upper limit in logN
+        print('logN-1sig: {}'.format(self.logN_1sig))
+        print('logN-2sig: {}'.format(self.logN_2sig))
+        print('logN-3sig: {}'.format(self.logN_3sig))
 
     def get_EW_total(self, v_min, v_max):
 
@@ -677,8 +686,8 @@ class ion_transition:
 
         # Add axes labels
         if label_axes == True:
-            ax.set_xlabel('Velocity (km/s)')
-            ax.set_ylabel('Continuum normalized flux')
+            ax.set_xlabel('Relative Velocity (km/s)')
+            ax.set_ylabel('Flux (continuum normalized)')
 
         #  Indicate the transition properly in the plot
         ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name, fontsize=12)
@@ -690,7 +699,7 @@ class ion_transition:
             return fig, ax
 
     def fit_ion_transition(self, 
-                           logN_min = -np.inf, logN_max = 25., 
+                           logN_min = 0., logN_max = 25., 
                            b_min = 0., b_max = 100., 
                            logT_min = 4., logT_max = 6.,
                            b_NT_min = 0., b_NT_max = 50.,    
@@ -918,7 +927,7 @@ class ion_transition:
                 lw=1.5, color='red')
 
         if label_axes == True:
-            ax.set_xlabel('Velocity (km/s)')
+            ax.set_xlabel('Relative Velocity (km/s)')
             ax.set_ylabel('Flux (continuum normalized)')
 
         ax.axhline(0, color='red', linestyle=':')
@@ -1009,10 +1018,10 @@ class ion(ion_transition):
                 # Create a big subplot
                 ax_label = fig.add_subplot(111, frameon=False)
                 # hide tick and tick label of the big axes
-                plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
-
-                ax_label.set_xlabel('Velocity (km/s)') # Use argument `labelpad` to move label downwards.
-                ax_label.set_ylabel('Flux (continuum normalized)')
+                ax_label.set_xticks([])
+                ax_label.set_yticks([])
+                ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=15) # Use argument `labelpad` to move label downwards.
+                ax_label.set_ylabel('Flux (continuum normalized)', labelpad=25)
 
             plt.subplots_adjust(wspace=0, hspace=0)
 
@@ -1078,156 +1087,16 @@ class ion(ion_transition):
 
             if label_axes == True:
                 ax_label = fig.add_subplot(111, frameon=False)
-                plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
-
-                ax_label.set_xlabel('Velocity (km/s)')
-                ax_label.set_ylabel('Flux (continuum normalized)')
+                ax_label.set_xticks([])
+                ax_label.set_yticks([])
+                ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=15)
+                ax_label.set_ylabel('Flux (continuum normalized)', labelpad=25)
 
             plt.subplots_adjust(wspace=0, hspace=0)
  
         return fig, axes
-    
-    def get_upper_limit(self, b, v_c, load=False, loaddir = '', logN_min = -10, logN_max = 18.5, N_trials = 1000, N_samples=1000, cdf_ul=.975):
 
-        '''
-        Method to get a 2-sigma upper limit for a single component of an ion 
-
-        b: the fixed Doppler parameter component of the ionic species (hopefully determined from joint Voigt profile fitting of detected ions)
-        v_c: the centroid for the component (also determined from Voigt profile analysis)
-        load: whether or not to load an already stored result
-        loaddir: where to load stuff from
-        logN_min: the lower bound of the uniform distribution for logN from which to draw samples for the Monte Carlo experiment
-        logN_max: the upper bound of the uniform distribution for logN from which to draw samples for the Monte Carlo experiment
-        N_trials: the number of trials to run for the Monte Carlo experiment
-        N_samples: the number of samples of logN to draw from a uniform distribution of logN=[logN_min, logN_max]
-        '''    
-
-        if load == True:
-
-            logN_MC_arr = np.load(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/logN_MC_arr.npy')
-            PDF_MC_arr = np.load(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/PDF_MC_arr.npy')
-            CDF_MC_arr = np.load(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/CDF_MC_arr.npy')
-            logN_CDF_median_grid = np.load(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/logN_CDF_median_grid.npy')
-            CDF_median = np.load(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/CDF_median.npy')
-            #logN_PDF_samples = np.load(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/logN_PDF_samples.npy')
-
-        else:
-            # First calculate the FWHM corresponding to the b-value
-            # NOTE: this should ideally be computed numerically, but we'll just assume the profile to be effectively Gaussian
-
-            fwhm = 2*np.sqrt(np.log(2))*b # Formula for Gaussian FWHM
-
-            # Specify data strucutres to store column densities, and probabilistic quantities across various trials
-
-            # For storing sampled column densities across trials
-            logN_MC_arr = np.zeros((N_trials, N_samples))
-
-            # For storing calculated chi-square across all trials
-            chi_sq_MC_arr = np.zeros((N_trials, N_samples))
-
-            # For storing PDF obtained from chi-sq for all trials
-            # NOTE: this is a PDF of N, NOT logN, despite the samples being drawn from logN!
-            # This is because logN is only a convenient way of sampling a large dynamic range in linear space
-            # If we interpret the PDF to be defined over logN, it will not be normalizable 
-            # Consider logN from -infinity to 0 to see why - the probability will stay flat, making the PDF not normalizable
-            # If it is defined over linear space instead, it will be normalizable and can be used for subsequence CDF calculations
-            PDF_MC_arr = np.zeros((N_trials, N_samples))
-
-            # For storing numerically evaluated CDFs for the PDFs across various trials
-            CDF_MC_arr = np.zeros((N_trials, N_samples))
-
-            # List of interpolated CDFs across all trials, will help in median stacking all the CDFs later
-            CDF_MC_interp_arr = []
-
-            # Begin trials of the Monte Carlo experiment
-
-            for i in range(N_trials):
-
-                # Draw samples of logN from a uniform distribution
-                logN_samples = np.sort(np.random.uniform(low=logN_min, high=logN_max, size=N_samples))
-
-                # Now consider a particular value of logN
-                for j in range(N_samples):
-                    
-                    # Finally, iterate through all the transitions present in the current ion
-                    for k in range(self.n_ion_transitions):
-
-                        # Isolate the ion transition
-                        ion_transition = self.ion_transitions_list[k]
-
-                        # Initialize the ion transition with the current value of logN, fixed b and v_c
-
-                        # Up next, isolate the part of the spectrum within 2*fwhm of the centroid
-                        # NOTE: use masked velocities! You will have need to run fit_ion_transition() for the masked velocities to be created
-                        idx = (ion_transition.v_mask>v_c-fwhm) & (ion_transition.v_mask<v_c+fwhm)
-
-                        # Calculate the chi-sq using the masked region
-                        # Just add on the value you compile across transitions
-                        model_flux = comp_model_spec_gen(ion_transition.v_mask, np.array([[logN_samples[j], b, v_c]]), 
-                                                        ion_transition.wav0_rest, ion_transition.f,ion_transition.gamma,ion_transition.A,
-                                                        ion_transition.lsf_convolve,
-                                                        ion_transition.lsf, ion_transition.v_lsf)[1]
-                        chi_sq_MC_arr[i,j] += np.sum(((model_flux[idx]-ion_transition.flux_norm_mask[idx])/ion_transition.err_norm_mask[idx])**2)
-
-                # Store the samples from logN drawn for this trial
-                logN_MC_arr[i,:] = logN_samples
-                # Construct the PDF for the chi-sq evaluated for these samples
-                PDF_MC_arr[i,:] = np.exp(-.5*chi_sq_MC_arr[i,:])
-                # Normalize the PDF - REMEMBER, this is a PDF for N, not logN!
-                PDF_MC_arr[i,:] /= integrate.trapz(x=10**logN_samples, y=PDF_MC_arr[i,:])
-                # Construct the CDF
-                CDF_MC_arr[i,:] = integrate.cumtrapz(x=10**logN_samples, y=PDF_MC_arr[i,:], initial=0)
-                # Interpolate the CDF and store it
-                CDF_MC_interp_arr.append(interpolate.interp1d(x=10**logN_samples, y=CDF_MC_arr[i,:], fill_value='extrapolate'))
-
-            # Then, median stack the CDFs
-            # Begin by generating a uniform grid for logN
-            logN_CDF_median_grid = np.linspace(logN_min, logN_max, N_samples)
-
-            # For storing the median CDF
-            CDF_median = np.zeros(N_samples)
-
-            for j in range(N_samples):
-                # Evaluate the interpolated CDF for each trial (denoted by i) at each grid point (denoted by j)
-                CDF_median[j] = np.median([CDF_MC_interp_arr[i](10**logN_CDF_median_grid[j]) for i in range(N_trials)])
-
-
-            # Save everything
-            if not os.path.exists(loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)):
-                os.makedirs(loaddir+'Ions/z={0}/{1}'.format(self.z, self.name))
-            np.save(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/logN_MC_arr.npy', arr=logN_MC_arr)
-            np.save(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/PDF_MC_arr.npy', arr=PDF_MC_arr)
-            np.save(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/CDF_MC_arr.npy', arr=CDF_MC_arr)
-            np.save(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/logN_CDF_median_grid.npy', arr=logN_CDF_median_grid)
-            np.save(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/CDF_median.npy', arr=CDF_median)
-
-        # Interpolate the inverse of the median stacked CDF
-        CDF_median_inv_interp = interpolate.interp1d(x=CDF_median, y=10**logN_CDF_median_grid, fill_value='extrapolate')
-
-        # Generate samples of using the median CDF
-        CDF_samples = np.random.uniform(size=N_samples)
-
-        # Evaluate the inverses for all these CDF samples
-        # NOTE: this won't work well for upper limits, because a HUGE range of column densities have similar values for the CDF
-        logN_PDF_samples = np.array([np.log10(CDF_median_inv_interp(y)) for y in CDF_samples])
-        # Save this for CLOUDY modeling later
-        np.save(file=loaddir+'Ions/z={0}/{1}'.format(self.z, self.name)+'/logN_PDF_samples.npy', arr=logN_PDF_samples)
-
-        # Evaluate the interpolated inverse median-stacked CDF at the required level of confidence to get the upper limit
-        logN_ul = np.log10(CDF_median_inv_interp(cdf_ul))
-
-        # Set the logN samples, normalized PDFs, and numerically evaluated CDFs from the Monte Carlo run
-        # Also returned the uniform grid of logN and the median stacked CDF evaluated across this uniform grid 
-        # Finally, report the calculated upper limit
-        self.logN_MC_arr = logN_MC_arr
-        self.PDF_MC_arr = PDF_MC_arr
-        self.CDF_MC_arr = CDF_MC_arr 
-        self.logN_CDF_median_grid = logN_CDF_median_grid
-        self.CDF_median = CDF_median
-        self.logN_PDF_samples = logN_PDF_samples
-        self.logN_ul = logN_ul
-
-    def fit_ion(self, logN_min = -np.inf, logN_max = 25., 
+    def fit_ion(self, logN_min = 0., logN_max = 25., 
                       b_min = 0., b_max = 100., 
                       logT_min = 4., logT_max = 6.,
                       b_NT_min = 0., b_NT_max = 50.,
@@ -1406,10 +1275,10 @@ class ion(ion_transition):
 
             if label_axes == True:
                 ax_label = fig.add_subplot(111, frameon=False)
-                plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
-
-                ax_label.set_xlabel('Velocity (km/s)')
-                ax_label.set_ylabel('Flux (continuum normalized)')
+                ax_label.set_xticks([])
+                ax_label.set_yticks([])
+                ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=15)
+                ax_label.set_ylabel('Flux (continuum normalized)', labelpad=25)
 
             plt.subplots_adjust(wspace=0, hspace=0)                
 
@@ -1516,9 +1385,9 @@ class ion(ion_transition):
 
         if label_axes == True:
             ax_label = fig.add_subplot(111, frameon=False)
-            plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
-
-            ax_label.set_xlabel('Steps')
+            ax_label.set_xticks([])
+            ax_label.set_yticks([])
+            ax_label.set_xlabel('Steps', labelpad=15)
 
         plt.tight_layout()      
 
@@ -1688,10 +1557,10 @@ class ion(ion_transition):
 
             if label_axes == True:
                 ax_label = fig.add_subplot(111, frameon=False)
-                plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
-
-                ax_label.set_xlabel('Velocity (km/s)')
-                ax_label.set_ylabel('Flux (continuum normalized)')
+                ax_label.set_xticks([])
+                ax_label.set_yticks([])
+                ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=15)
+                ax_label.set_ylabel('Flux (continuum normalized)', labelpad=25)
 
             plt.subplots_adjust(wspace=0, hspace=0)      
 
@@ -1773,7 +1642,7 @@ class ion_suite(ion):
         if fig is not None and axes is not None:
             return fig, axes        
 
-    def fit_ion_suite(self, logN_min = -np.inf, logN_max = 25., 
+    def fit_ion_suite(self, logN_min = 0., logN_max = 25., 
                       b_min = 0., b_max = 100., 
                       logT_min = 4., logT_max = 6.,
                       b_NT_min = 0., b_NT_max = 50.,
@@ -1886,7 +1755,9 @@ class ion_summary(ion_suite):
         self.ion_suite_name_list = [ion_suite.name for ion_suite in self.ion_suite_list]
         self.ion_transitions_name_list = [ion_transition.name for ion_transition in self.ion_transitions_list]
 
-    def plot_samples(self, fig=None, axes=None, n_samples=100, draw_masks=True, label_axes=True, n_cols=2):
+    def plot_samples(self, fig=None, axes=None, n_samples=100, 
+                     draw_masks=True, label_axes=True, label_axes_pad_x = 20, label_axes_pad_y = 30,
+                     n_cols=2):
 
         '''
         Method to plot randomly chosen samples from the posterior explored by MCMC walkers
@@ -2138,10 +2009,13 @@ class ion_summary(ion_suite):
 
         if label_axes == True:
             ax_label = fig.add_subplot(111, frameon=False)
-            plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+            ax_label.set_xticks([])
+            ax_label.set_yticks([])
+            #plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+            #plt.minorticks_off()
 
-            ax_label.set_xlabel('Velocity (km/s)')
-            ax_label.set_ylabel('Flux (continuum normalized)')
+            ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=label_axes_pad_x, fontsize=20)
+            ax_label.set_ylabel('Flux (continuum normalized)', labelpad=label_axes_pad_y, fontsize=20)
 
         plt.subplots_adjust(wspace=0, hspace=0)      
 

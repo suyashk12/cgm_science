@@ -53,9 +53,9 @@ text.latex.preamble : \usepackage{amsmath} \usepackage{amssymb}
 
 figure.facecolor : w
 
-font.size : 14
-xtick.labelsize : 12
-ytick.labelsize : 12
-axes.labelsize : 14
+font.size : 16
+xtick.labelsize : 16
+ytick.labelsize : 16
+axes.labelsize : 16
 
 grid.linestyle : :
