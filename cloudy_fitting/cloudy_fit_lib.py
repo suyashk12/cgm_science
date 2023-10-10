@@ -1298,11 +1298,11 @@ def log_likelihood(params, logN_dict, species_logN_interp):
     # Return log likelihood for MCMC
     return ll
 
-##########################################################
-#### Utilities for constraining a multiphase solution ####
-##########################################################
+#########################################################
+#### Utilities for constraining a two phase solution ####
+#########################################################
 
-def log_prior_tp(params, species_logN_interp):
+def log_prior_two_phase(params, species_logN_interp):
     
     '''
     Priors for an MCMC search. 
@@ -1315,39 +1315,26 @@ def log_prior_tp(params, species_logN_interp):
     
     # If the sampled density is within the CLOUDY limits
     # Avoid edges?
-    if logN_HI_min<logN_HI_p1<logN_HI_max: 
-        if log_hdens_min<log_hdens_p1<log_hdens_max: 
-                if log_metals_min<log_metals_p1<log_metals_max:
-                    if logN_HI_min<logN_HI_p2<logN_HI_max: 
-                        if log_hdens_min<log_hdens_p2<log_hdens_max: 
-                            if log_metals_min<log_metals_p2<log_metals_max:
-                                if log_hdens_p1 > log_hdens_p2:
-                                    # Get cloud sizes
-                                    l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
-                                    l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
-                                    if l_p1 < l_p2 and logN_HI_p1 > logN_HI_p2:
-                                        if l_p2 < 100:
-                                            return 0.0
-                                        else:
-                                            return -np.inf
-                                    else:
-                                        return -np.inf
-                                else:
-                                    return -np.inf
-                            else:
-                                return -np.inf
-                        else:
-                            return -np.inf
+    if logN_HI_min<logN_HI_p1<logN_HI_max and log_hdens_min<log_hdens_p1<log_hdens_max and log_metals_min<log_metals_p1<log_metals_max:
+        if logN_HI_min<logN_HI_p2<logN_HI_max and log_hdens_min<log_hdens_p2<log_hdens_max and log_metals_min<log_metals_p2<log_metals_max:
+            if log_hdens_p1>log_hdens_p2:
+                if logN_HI_p1>logN_HI_p2:
+                    l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
+                    l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
+                    if l_p1<l_p2<100:
+                        return 0.0
                     else:
                         return -np.inf
                 else:
                     return -np.inf
+            else:
+                return -np.inf
         else:
             return -np.inf
-    else: 
+    else:
         return -np.inf
 
-def log_likelihood_tp(params, logN_dict, species_logN_interp):
+def log_likelihood_two_phase(params, logN_dict, species_logN_interp):
 
     '''
     Likelihood function for comparing CLOUDY predicted column densities to the observed values from VP fit.
@@ -1386,6 +1373,141 @@ def log_likelihood_tp(params, logN_dict, species_logN_interp):
             y_bar_2 = logN_HI_p2
 
         y_bar = np.log10(10**y_bar_1 + 10**y_bar_2)
+
+        # Based on detection or non-detection, compute the likelihood term
+        
+        # Detection
+        if logN_str[0] != '<' and logN_str[0] != '>':
+            
+            logN_arr = np.array(logN_str.split(','), dtype=float)
+            
+            # Observed column density
+            y = logN_arr[0]
+
+            # Use max of lower and upper error for defining Gaussian distribution of column density
+            sig_y = max(-logN_arr[1], logN_arr[2])
+
+            # Gaussian likelihood
+            ll += -.5*(y-y_bar)**2/sig_y**2
+
+        # Upper limit
+        elif logN_str[0] == '<':
+            
+            logN_arr = np.array(logN_str[1:].split(','), dtype=float)
+
+            # Isolate the lower limit and sigma
+            y = logN_arr[0]
+            sig_y = 0.14
+
+            y_range_min = -10 # Should extend to infinity, ideally
+            y_range_step = 0.05
+
+            y_range = np.arange(y_range_min, y+y_range_step, y_range_step)
+
+            # CDF, marginalize over reported values
+            ll += np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/sig_y**2)))
+            
+        # Lower limit
+        # NOTE: not implemented yet
+        elif logN_str[0] == '>':
+
+            logN_arr = np.array(logN_str[1:].split(','), dtype=float)
+
+            # Isolate the lower limit and sigma
+            y = logN_arr[0]
+            sig_y = 0.14
+
+            y_range_max = 21.5 # Should extend to infinity, ideally
+            y_range_step = 0.05
+
+            y_range = np.arange(y, y_range_max+y_range_step, y_range_step)
+
+            # "Q"-function, marginalize over reported values
+            ll += np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/sig_y**2)))
+
+    # Return log likelihood for MCMC
+    return ll
+
+#########################################################
+#### Utilities for constraining a three phase solution ##
+#########################################################
+
+def log_prior_three_phase(params, species_logN_interp):
+    
+    '''
+    Priors for an MCMC search. 
+
+    params_dict: Dictionary of parameters being fitted. Will contain logN_HI, n_H, [O/H], and [X/H]
+    '''
+
+    # Grid parameters being varied
+    logN_HI_p1, log_hdens_p1, log_metals_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, logN_HI_p3, log_hdens_p3, log_metals_p3 = params
+    
+    # If the sampled density is within the CLOUDY limits
+    # Avoid edges?
+    if logN_HI_min<logN_HI_p1<logN_HI_max and log_hdens_min<log_hdens_p1<log_hdens_max and log_metals_min<log_metals_p1<log_metals_max:
+        if logN_HI_min<logN_HI_p2<logN_HI_max and log_hdens_min<log_hdens_p2<log_hdens_max and log_metals_min<log_metals_p2<log_metals_max:
+            if logN_HI_min<logN_HI_p3<logN_HI_max and log_hdens_min<log_hdens_p3<log_hdens_max and log_metals_min<log_metals_p3<log_metals_max:
+                if log_hdens_p1>log_hdens_p2>log_hdens_p3:
+                    if logN_HI_p1>logN_HI_p2>logN_HI_p3:
+                        l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
+                        l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
+                        l_p3 = get_cloud_size(logN_HI_p3, log_hdens_p3, species_logN_interp, log_metals_p3)
+                        if l_p1<l_p2<l_p3<100:
+                            return 0.0
+                        else:
+                            return -np.inf
+                    else:
+                        return -np.inf
+                else:
+                    return -np.inf
+            else:
+                return -np.inf
+        else:
+            return -np.inf
+    else:
+        return -np.inf
+
+def log_likelihood_three_phase(params, logN_dict, species_logN_interp):
+
+    '''
+    Likelihood function for comparing CLOUDY predicted column densities to the observed values from VP fit.
+    If only some of the parameters need to be fit, the log_likelihood function can be overridden with a lambda function
+    which calls this likelihood function with only some parameters being varied.
+
+    params: parameters needed to generate CLOUDY predicted column densities
+    logN_dict: dictionary of measured column densities from VP fit
+    species_logN_interp: interpolated CLOUDY grid
+    '''
+    
+    # Grid parameters being varied
+    logN_HI_p1, log_hdens_p1, log_metals_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, logN_HI_p3, log_hdens_p3, log_metals_p3 = params
+
+    # Likelihood function
+    ll = 0
+    
+    ions = list(logN_dict.keys())
+    
+    # Ignore first entry since it's HI
+    for i in range(len(ions)):
+        
+        # This is from VP fit
+        ion = ions[i]
+        logN_str = logN_dict[ion]
+        
+        # This is from CLOUDY
+        s = ion_species_dict[ion]
+        
+        # Get interpolated column density from CLOUDY grid
+        if ion != 'HI':
+            y_bar_1 = species_logN_interp[s]([logN_HI_p1, log_hdens_p1, log_metals_p1])[0]
+            y_bar_2 = species_logN_interp[s]([logN_HI_p2, log_hdens_p2, log_metals_p2])[0]
+            y_bar_3 = species_logN_interp[s]([logN_HI_p3, log_hdens_p3, log_metals_p3])[0]
+        else:
+            y_bar_1 = logN_HI_p1
+            y_bar_2 = logN_HI_p2
+
+        y_bar = np.log10(10**y_bar_1 + 10**y_bar_2 + 10**y_bar_3)
 
         # Based on detection or non-detection, compute the likelihood term
         
