@@ -1553,7 +1553,8 @@ class ion(ion_transition):
                     alpha=0
                     lw=0
 
-                ax.plot(ion_transition.v, sample_total_flux, color=c, alpha=alpha, lw=lw)
+                if j == n_samples:
+                    ax.plot(ion_transition.v, sample_total_flux, color=c, alpha=alpha, lw=lw)
 
             if label_axes == True:
                 ax_label = fig.add_subplot(111, frameon=False)
@@ -2003,7 +2004,8 @@ class ion_summary(ion_suite):
                         alpha=0
                         lw=0
 
-                    ax.plot(ion_transition.v, sample_total_flux, color=c, alpha=alpha, lw=lw)
+                    if j == n_samples:
+                        ax.plot(ion_transition.v, sample_total_flux, color=c, alpha=alpha, lw=lw)
 
                 ion_transition_ctr = ion_transition_ctr + 1
 
@@ -2218,6 +2220,10 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models):
     # Begin a list of residuals
     resid_list = []
 
+    # Keep track of ln_prior - important because we are using logN and the LMFIT prior is constant
+    # So we will transfer the N dependence to the likelihood itself - it should be operationally equivalent
+    ln_prior = 0
+
     # Define an objective function that can take in multiple datasets and generate a flattened residual array
 
     for i in range(n_ion_transitions):
@@ -2251,6 +2257,9 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models):
                 params_comp = [params_dict['it{}c{}_logN'.format(i+1,j+1)], params_dict['it{}c{}_logT'.format(i+1,j+1)],
                                params_dict['it{}c{}_b_NT'.format(i+1,j+1)], params_dict['it{}c{}_dv_c'.format(i+1,j+1)]]
                 
+            # Add in column densities for each component
+            ln_prior += params_comp[0] 
+
             params_list_reshape.append(params_comp)
 
 
@@ -2293,6 +2302,7 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models):
         return resid_flat
     # For emcee, compute the squared sum of the flattened residual array to obtain chi-sq, 
     # multiply by -0.5 to get log likelihood probability
+    # Also included a ln(prior) term because assumed prior is flat
     elif method=='emcee':
-        return -0.5*np.sum(resid_flat**2)
+        return -0.5*np.sum(resid_flat**2) + ln_prior
     
