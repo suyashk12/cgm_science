@@ -782,7 +782,7 @@ class ion_transition:
         
         # Now, optimize the objective function
         self.exclude_models = exclude_models
-        result = minimize(weighted_residuals, params, args=([self], 'lmfit'), kws={'exclude_models':self.exclude_models})
+        result = minimize(weighted_residuals, params, args=([self], 'lmfit', self.exclude_models, None))
         self.result = result
 
         # Record the best-fit parameters
@@ -1174,7 +1174,7 @@ class ion(ion_transition):
         # Now, optimize the objective function
         # NaN policy of propagate for excluding models, is this safe?
         self.exclude_models = exclude_models
-        result = minimize(weighted_residuals, params, args=(self.ion_transitions_list, 'lmfit', self.exclude_models), nan_policy='propagate')
+        result = minimize(weighted_residuals, params, args=(self.ion_transitions_list, 'lmfit', self.exclude_models, None), nan_policy='propagate')
 
         self.result = result 
 
@@ -1321,7 +1321,13 @@ class ion(ion_transition):
 
             # Run the MCMC chain
             # Again NaN policy is simply for handling excluded models
-            result_emcee = minimize(weighted_residuals, self.result.params, method='emcee', args=(self.ion_transitions_list, 'emcee', self.exclude_models),
+            var_names_logN = [v for v in self.result.var_names if 'logN' in v]
+
+            result_emcee = minimize(weighted_residuals, self.result.params, method='emcee', 
+                                    args=(self.ion_transitions_list, 
+                                          'emcee', 
+                                          self.exclude_models, 
+                                          var_names_logN),
                                     float_behavior='posterior', nan_policy='propagate',
                                     nwalkers=n_walkers, steps=n_steps, burn=n_burn, thin=n_thin, pos=init_pos, is_weighted=True, progress=True)
 
@@ -2212,17 +2218,13 @@ def log_to_linear_PDF(flatchain, bins=250):
 
     return X, pdf, cdf, cdf_inv_interp
 
-def weighted_residuals(params, ion_transitions_list, method, exclude_models):
+def weighted_residuals(params, ion_transitions_list, method, exclude_models, var_names):
 
     # Get number of ion transitions
     n_ion_transitions = len(ion_transitions_list)
 
     # Begin a list of residuals
     resid_list = []
-
-    # Keep track of ln_prior - important because we are using logN and the LMFIT prior is constant
-    # So we will transfer the N dependence to the likelihood itself - it should be operationally equivalent
-    ln_prior = 0
 
     # Define an objective function that can take in multiple datasets and generate a flattened residual array
 
@@ -2257,9 +2259,6 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models):
                 params_comp = [params_dict['it{}c{}_logN'.format(i+1,j+1)], params_dict['it{}c{}_logT'.format(i+1,j+1)],
                                params_dict['it{}c{}_b_NT'.format(i+1,j+1)], params_dict['it{}c{}_dv_c'.format(i+1,j+1)]]
                 
-            # Add in column densities for each component
-            ln_prior += params_comp[0] 
-
             params_list_reshape.append(params_comp)
 
 
@@ -2296,6 +2295,14 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models):
                 #print('test')
                 # Render the model improbable
                 resid_flat *= np.inf
+
+    # Keep track of ln_prior - important because we are using logN and the LMFIT prior is constant
+    # So we will transfer the N dependence to the likelihood itself - it should be operationally equivalent
+    ln_prior = 0
+
+    if var_names is not None:
+        logN_prior_arr = np.array([params.valuesdict()[v] for v in var_names])
+        ln_prior = np.sum(np.log(10**logN_prior_arr))
     
     # If method is LMFIT, flatten the output and convert to a numpy array to pass to lmfit
     if method=='lmfit':
@@ -2304,5 +2311,6 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models):
     # multiply by -0.5 to get log likelihood probability
     # Also included a ln(prior) term because assumed prior is flat
     elif method=='emcee':
-        return -0.5*np.sum(resid_flat**2) + ln_prior
+        #print(ln_prior)
+        return -0.5*np.sum(resid_flat**2) + ln_prior # Exponentiating just leads to a product of linear column densities
     
