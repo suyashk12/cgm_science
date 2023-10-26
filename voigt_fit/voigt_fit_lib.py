@@ -2302,7 +2302,7 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models, var
 
     if var_names is not None:
         logN_prior_arr = np.array([params.valuesdict()[v] for v in var_names])
-        ln_prior = np.sum(np.log(10**logN_prior_arr))
+        ln_prior = np.sum(np.log(10**logN_prior_arr)) # Convert log10(N) to N, then take natural log and add
     
     # If method is LMFIT, flatten the output and convert to a numpy array to pass to lmfit
     if method=='lmfit':
