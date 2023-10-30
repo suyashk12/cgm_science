@@ -2291,7 +2291,7 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models, var
             op  = operator_dict[s_split[1]]
             p2 = s_split[2]
             # If the condition is satisfied
-            if op(params[p1].value, params[p2].value):
+            if op(params[p1].value, params[p2].value): # Can we add a constant offset here? Should be possible to do by including an extra keyword for exclude_models
                 #print('test')
                 # Render the model improbable
                 resid_flat *= np.inf
