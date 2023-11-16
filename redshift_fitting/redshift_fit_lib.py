@@ -7,9 +7,9 @@ plt.style.use('/Users/thepoetoftwilight/Documents/CUBS/Code/science.mplstyle')
 
 gal_lines = np.loadtxt('redshiftLines.dat', skiprows=1, dtype=str)
 
-def load_ldss_spec_2d(loaddir, slit_num):
+def load_ldss_spec_2d(loaddir, mask_num, slit_num):
 
-    spec_2d_fits = fits.open(loaddir + 'Spectra_2D/{}sum.fits'.format(slit_num))
+    spec_2d_fits = fits.open(loaddir + 'Spectra_2D/m{}/{}sum.fits'.format(mask_num, slit_num))
 
     spec_2d = spec_2d_fits[0].data
 
@@ -20,9 +20,11 @@ def load_ldss_spec_2d(loaddir, slit_num):
 
     return wav, spec_2d
 
-def load_ldss_spec_1d(loaddir, slit_num):
+def load_ldss_spec_1d(loaddir, mask_num, slit_num):
 
-    spec_1d_fits = fits.open(loaddir + 'Spectra_1D/{}_1dspec.fits'.format(slit_num))
+    # Load the flat-fielded spectrum 
+
+    spec_1d_fits = fits.open(loaddir + 'Spectra_1D/m{}/{}_1dspec.fits'.format(mask_num, slit_num))
     
     wav0 = spec_1d_fits[0].header['CRVAL1']
     delta_wav = spec_1d_fits[0].header['CDELT1']
@@ -31,8 +33,26 @@ def load_ldss_spec_1d(loaddir, slit_num):
     err = spec_1d_fits[0].data[5,:]
     
     wav = np.arange(wav0, wav0+len(flux)*delta_wav, delta_wav)
+
+    # Load the response function
+    resp_df = pd.read_csv(loaddir + 'ldss_vph_red_resp.csv')
+
+    wav_resp = resp_df['Wavelength']
+    flux_resp = resp_df['Response']
+
+    flux_resp_interp = np.interp(wav, wav_resp, flux_resp)
+
+    # Divide out by the response function
+    flux /= flux_resp_interp
+    err /= flux_resp_interp
     
+    # Save the 1D spectrum
+    np.savetxt(loaddir + 'Spectra_1D/m{}/{}.dat'.format(mask_num, slit_num), 
+               np.vstack((wav, flux, err)).T,
+              delimiter = '\t')
+
     return wav, flux, err
+
 
 def load_eigenspec(loaddir='/Users/thepoetoftwilight/Documents/CUBS/Data/Eigenspectra/eigen_galaxy_Bolton2012.csv'):
 
@@ -126,14 +146,14 @@ def eval_red_chi_sq(y_hat, y, y_err, dof):
     return np.sum(((y-y_hat)/y_err)**2)/(len(y)-dof)
 
 
-def eval_spec_z(loaddir, slit_num,
+def eval_spec_z(loaddir, mask_num, slit_num,
                 z_min=0, z_max=1.4, z_step=1e-4, wav_min=5000, wav_max=9800):
 
     '''
     Evaluate best linear combination of template spectra in a coarse grid of redshifts
     '''
 
-    wav, flux, err = load_ldss_spec_1d(loaddir, slit_num)
+    wav, flux, err = load_ldss_spec_1d(loaddir, mask_num, slit_num)
 
     z_arr = np.arange(z_min, z_max+z_step, z_step)
 
@@ -168,7 +188,7 @@ def eval_spec_z(loaddir, slit_num,
                 
         red_chi_sq_arr[i] = red_chi_sq
 
-    np.savetxt(loaddir + 'Redshifts/{}.dat'.format(slit_num), 
+    np.savetxt(loaddir + 'Redshifts/m{}/{}.dat'.format(mask_num, slit_num), 
                np.vstack((z_arr, model_params[:,0], model_params[:,1], model_params[:,2], model_params[:,3], red_chi_sq_arr)).T,
               delimiter = '\t')
 
@@ -236,7 +256,6 @@ def smooth_func(x_arr, y_arr, dx):
 
     return y_smooth
 
-
 def plot_gal_lines(ax, z, lw, y_pos, plot_list, wav_min, wav_max):
 
     for i in range(len(plot_list)):
@@ -248,14 +267,14 @@ def plot_gal_lines(ax, z, lw, y_pos, plot_list, wav_min, wav_max):
                 ax.axvline(wav_pos, linestyle=':', lw=lw)
                 ax.text(x=wav_pos, y=y_pos, rotation=270, s=l)
 
-def plot_spec_2d(ax, loaddir, slit_num, aspect='auto', 
-                wav_min = 5000, wav_max = 9800,
+def plot_spec_2d(ax, loaddir, mask_num, slit_num, aspect='auto', 
+                wav_min = 6000, wav_max = 9800,
                 y_min = 5, y_max = 22, 
                 vmin=0, vmax=500, cmap='gist_yarg', interpolation='antialiased',
                 plot_lines=False, z_gal=0, lw=0.7, y_pos=800, 
                 plot_list=['Ha', 'Hb', 'Hg', 'Hd', '[OII]', '[OIII]', 'CaIIH', 'CaIIK', 'MgI', 'NaI', 'G-band']):
 
-    wav, spec_2d = load_ldss_spec_2d(loaddir, slit_num)
+    wav, spec_2d = load_ldss_spec_2d(loaddir, mask_num, slit_num)
     y = np.arange(0, spec_2d.shape[0])
 
     wav_min_idx = np.argmin(np.abs(wav-wav_min))
@@ -276,26 +295,29 @@ def plot_spec_2d(ax, loaddir, slit_num, aspect='auto',
     #ax.set_xlabel('Wavelength (Å)')
     ax.set_ylabel('Slit Pixel')
 
-def plot_spec_1d(ax, loaddir, slit_num, smooth = False, dlam = 0,
-                wav_min = 5000, wav_max = 9800,
+def plot_spec_1d(ax, loaddir, mask_num, slit_num, smooth = False, dlam = 0,
+                wav_min = 6000, wav_max = 9800,
                 plot_lines=False, z_gal=0, lw=0.7, y_pos=800, 
                 plot_list=['Ha', 'Hb', 'Hg', 'Hd', '[OII]', '[OIII]', 'CaIIH', 'CaIIK', 'MgI', 'NaI', 'G-band'],
+                filt_windows = [[6850, 6950], [7588, 7684]],
                 plot_model=False):
 
-    wav, flux, err = load_ldss_spec_1d(loaddir, slit_num)
+    wav, flux, err = load_ldss_spec_1d(loaddir, mask_num, slit_num)
     
     if smooth==False:
         ax.step(wav, flux, where='mid', color='black')
     else:
         ax.step(wav, smooth_func(wav, flux, dlam))
 
-    ax.axvspan(xmin=6850, xmax=6950, color='grey', alpha=.5)
-    ax.axvspan(xmin=7588, xmax=7684, color='grey', alpha=.5)
+    for i in range(len(filt_windows)):
+        ax.axvspan(xmin=filt_windows[i][0], xmax=filt_windows[i][1], color='grey', alpha=.5)
+
+    #ax.axvspan(xmin=6850, xmax=6950, color='grey', alpha=.5)
+    #ax.axvspan(xmin=7588, xmax=7684, color='grey', alpha=.5)
 
     ax.step(wav, err, where='mid', color='cyan')
-    #ax.set_title('SLIT {}'.format(slit_num))
     ax.set_xlabel('Wavelength (Å)')
-    ax.set_ylabel(r'$f_{\lambda}$' + ' (Arbitrary Units)')
+    ax.set_ylabel(r'$f_{\lambda}$' + ' (erg/cm${}^2$/s/Å)')
     
     if plot_lines == True:
         plot_gal_lines(ax, z_gal, lw, y_pos, plot_list, wav_min, wav_max)
