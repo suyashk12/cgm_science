@@ -841,7 +841,17 @@ def log_prior(params):
     # If the sampled density is within the CLOUDY limits
     # Avoid edges?
     if logN_HI_min<logN_HI<logN_HI_max and log_hdens_min<log_hdens<log_hdens_max and log_metals_min<log_metals<log_metals_max:
-        return np.log(10**logN_HI) + np.log(10**log_hdens)
+
+        relative_abund = True
+
+        # Check if other elemental abundances are within bounds
+        for k in list(non_solar_dict.keys()):
+            relative_abund *= (log_metals_min<non_solar_dict[k]+log_metals<log_metals_max)
+
+        if relative_abund == True:
+            return np.log(10**logN_HI) + np.log(10**log_hdens)
+        else:
+            return -np.inf
     return -np.inf
 
 def log_likelihood(params, logN_dict, species_logN_interp):
@@ -954,12 +964,25 @@ def log_prior_two_phase(params, species_logN_interp):
     # Avoid edges?
     if logN_HI_min<logN_HI_p1<logN_HI_max and log_hdens_min<log_hdens_p1<log_hdens_max and log_metals_min<log_metals_p1<log_metals_max:
         if logN_HI_min<logN_HI_p2<logN_HI_max and log_hdens_min<log_hdens_p2<log_hdens_max and log_metals_min<log_metals_p2<log_metals_max:
-            if log_hdens_p1>log_hdens_p2:
-                if logN_HI_p1>logN_HI_p2:
-                    l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
-                    l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
-                    if l_p1<l_p2<100:
-                        return np.log(10**logN_HI_p1) + np.log(10**log_hdens_p1) + np.log(10**logN_HI_p2) + np.log(10**log_hdens_p2) # Convert log10 to linear, then take natural log
+
+            relative_abund = True
+
+            # Check if other elemental abundances are within bounds
+            for k in list(non_solar_dict_p1.keys()):
+                relative_abund *= (log_metals_min<non_solar_dict_p1[k]+log_metals_p1<log_metals_max)
+
+            for k in list(non_solar_dict_p2.keys()):
+                relative_abund *= (log_metals_min<non_solar_dict_p2[k]+log_metals_p2<log_metals_max)     
+
+            if relative_abund == True:       
+                if log_hdens_p1>log_hdens_p2:
+                    if logN_HI_p1>logN_HI_p2:
+                        l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
+                        l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
+                        if l_p1<l_p2<100:
+                            return np.log(10**logN_HI_p1) + np.log(10**log_hdens_p1) + np.log(10**logN_HI_p2) + np.log(10**log_hdens_p2) # Convert log10 to linear, then take natural log
+                        else:
+                            return -np.inf
                     else:
                         return -np.inf
                 else:
@@ -984,7 +1007,7 @@ def log_likelihood_two_phase(params, logN_dict, species_logN_interp):
     '''
     
     # Grid parameters being varied
-    logN_HI_p1, log_hdens_p1, log_metals_p1, logN_HI_p2, log_hdens_p2, log_metals_p2 = params
+    logN_HI_p1, log_hdens_p1, log_metals_p1, non_solar_dict_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, non_solar_dict_p2 = params
 
     # Likelihood function
     ll = 0
@@ -1008,6 +1031,13 @@ def log_likelihood_two_phase(params, logN_dict, species_logN_interp):
         else:
             y_bar_1 = logN_HI_p1
             y_bar_2 = logN_HI_p2
+
+        # If there is departure from solar abundance, shift the predicted column density accordingly
+        if s.split('+')[0] in non_solar_dict_p1:
+            y_bar_1 += non_solar_dict_p1[s.split('+')[0]]
+
+        if s.split('+')[0] in non_solar_dict_p2:
+            y_bar_2 += non_solar_dict_p2[s.split('+')[0]]
 
         y_bar = np.log10(10**y_bar_1 + 10**y_bar_2)
 
@@ -1078,20 +1108,37 @@ def log_prior_three_phase(params, species_logN_interp):
     '''
 
     # Grid parameters being varied
-    logN_HI_p1, log_hdens_p1, log_metals_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, logN_HI_p3, log_hdens_p3, log_metals_p3 = params
+    logN_HI_p1, log_hdens_p1, log_metals_p1, non_solar_dict_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, non_solar_dict_p2, logN_HI_p3, log_hdens_p3, log_metals_p3, non_solar_dict_p3 = params
     
     # If the sampled density is within the CLOUDY limits
     # Avoid edges?
     if logN_HI_min<logN_HI_p1<logN_HI_max and log_hdens_min<log_hdens_p1<log_hdens_max and log_metals_min<log_metals_p1<log_metals_max:
         if logN_HI_min<logN_HI_p2<logN_HI_max and log_hdens_min<log_hdens_p2<log_hdens_max and log_metals_min<log_metals_p2<log_metals_max:
             if logN_HI_min<logN_HI_p3<logN_HI_max and log_hdens_min<log_hdens_p3<log_hdens_max and log_metals_min<log_metals_p3<log_metals_max:
-                if log_hdens_p1>log_hdens_p2>log_hdens_p3:
-                    if logN_HI_p1>logN_HI_p2>logN_HI_p3:
-                        l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
-                        l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
-                        l_p3 = get_cloud_size(logN_HI_p3, log_hdens_p3, species_logN_interp, log_metals_p3)
-                        if l_p1<l_p2<l_p3<100:
-                            return np.log(10**logN_HI_p1) + np.log(10**log_hdens_p1) + np.log(10**logN_HI_p2) + np.log(10**log_hdens_p2) + np.log(10**logN_HI_p3) + np.log(10**log_hdens_p3)
+
+                relative_abund = True
+
+                # Check if other elemental abundances are within bounds
+                for k in list(non_solar_dict_p1.keys()):
+                    relative_abund *= (log_metals_min<non_solar_dict_p1[k]+log_metals_p1<log_metals_max)
+
+                for k in list(non_solar_dict_p2.keys()):
+                    relative_abund *= (log_metals_min<non_solar_dict_p2[k]+log_metals_p2<log_metals_max)   
+
+                for k in list(non_solar_dict_p3.keys()):
+                    relative_abund *= (log_metals_min<non_solar_dict_p3[k]+log_metals_p3<log_metals_max)   
+
+                if relative_abund == True:              
+
+                    if log_hdens_p1>log_hdens_p2>log_hdens_p3:
+                        if logN_HI_p1>logN_HI_p2>logN_HI_p3:
+                            l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
+                            l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
+                            l_p3 = get_cloud_size(logN_HI_p3, log_hdens_p3, species_logN_interp, log_metals_p3)
+                            if l_p1<l_p2<l_p3<100:
+                                return np.log(10**logN_HI_p1) + np.log(10**log_hdens_p1) + np.log(10**logN_HI_p2) + np.log(10**log_hdens_p2) + np.log(10**logN_HI_p3) + np.log(10**log_hdens_p3)
+                            else:
+                                return -np.inf
                         else:
                             return -np.inf
                     else:
@@ -1118,7 +1165,7 @@ def log_likelihood_three_phase(params, logN_dict, species_logN_interp):
     '''
     
     # Grid parameters being varied
-    logN_HI_p1, log_hdens_p1, log_metals_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, logN_HI_p3, log_hdens_p3, log_metals_p3 = params
+    logN_HI_p1, log_hdens_p1, log_metals_p1, non_solar_dict_p1, logN_HI_p2, log_hdens_p2, log_metals_p2, non_solar_dict_p2, logN_HI_p3, log_hdens_p3, log_metals_p3, non_solar_dict_p3 = params
 
     # Likelihood function
     ll = 0
@@ -1143,6 +1190,17 @@ def log_likelihood_three_phase(params, logN_dict, species_logN_interp):
         else:
             y_bar_1 = logN_HI_p1
             y_bar_2 = logN_HI_p2
+            y_bar_3 = logN_HI_p3
+
+        # If there is departure from solar abundance, shift the predicted column density accordingly
+        if s.split('+')[0] in non_solar_dict_p1:
+            y_bar_1 += non_solar_dict_p1[s.split('+')[0]]
+
+        if s.split('+')[0] in non_solar_dict_p2:
+            y_bar_2 += non_solar_dict_p2[s.split('+')[0]]
+
+        if s.split('+')[0] in non_solar_dict_p3:
+            y_bar_3 += non_solar_dict_p3[s.split('+')[0]]
 
         y_bar = np.log10(10**y_bar_1 + 10**y_bar_2 + 10**y_bar_3)
 
