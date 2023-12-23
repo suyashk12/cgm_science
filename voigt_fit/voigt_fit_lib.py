@@ -357,7 +357,8 @@ class ion_transition:
         if create_fig_ax == True:
             return fig, axes
 
-    def plot_ion_transition_spec(self, fig = None, ax = None, draw_masks = True, draw_cont_bounds = True, label_axes=True):
+    def plot_ion_transition_spec(self, fig = None, ax = None, draw_masks = True, 
+                                 draw_cont_bounds = True, label_axes=True, label_ion=True):
 
         '''
         Method to draw the continuum normalized spectrum of the transition
@@ -394,7 +395,8 @@ class ion_transition:
             ax.set_xlabel('Relative Velocity (km/s)')
             ax.set_ylabel('Flux (continuum normalized)')
 
-        ax.text(self.v[0]+30, 0.25, self.name+ ', ' + self.instrument, fontsize=15, weight='bold')
+        if label_ion == True:
+            ax.text(self.v[0]+30, 0.25, self.name+ ', ' + self.instrument, fontsize=15, weight='bold')
 
         #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name+ ', ' + self.instrument, fontsize=12)
         #ax.text(self.v[-1]-120, np.max(self.err_norm)+.1, '$\lambda = $' + str(np.round(self.wav0_obs,2)) + 'Å', fontsize=12)
