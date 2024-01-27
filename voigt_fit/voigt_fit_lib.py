@@ -661,7 +661,8 @@ class ion_transition:
                             lw=1, color=colors[i])
 
                     # Also indicate the velocity centroid
-                    ax.axvline(self.init_values[i][2], color=colors[i], linestyle=':')
+                    ax.vlines(x=self.init_values[i][2], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
+                    #ax.axvline(self.init_values[i][2], color=colors[i], linestyle=':')
 
                 # If constraining logT and b_NT
 
@@ -675,7 +676,8 @@ class ion_transition:
                             lw=1, color=colors[i])
 
                     # Also indicate the velocity centroid
-                    ax.axvline(self.init_values[i][3], color=colors[i], linestyle=':')
+                    ax.vlines(x=self.init_values[i][3], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
+                    #ax.axvline(self.init_values[i][3], color=colors[i], linestyle=':')
 
             # Plot the combined flux
             ax.plot(self.v, self.init_total_flux,
@@ -692,7 +694,8 @@ class ion_transition:
             ax.set_ylabel('Flux (continuum normalized)')
 
         #  Indicate the transition properly in the plot
-        ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name, fontsize=12)
+        ax.text(self.v[0]+30, 0.25, self.name+ ', ' + self.instrument, fontsize=15, weight='bold')
+        #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name, fontsize=12)
 
         # Indicate legend if requested
         if(legend == True):
@@ -886,7 +889,8 @@ class ion_transition:
                         'd$v_c$ = ' + dv_c_str + dv_c_err_str + ' km/s',
                         lw=1, color=colors[i])
 
-                ax.axvline(self.best_values[i][2], color=colors[i], linestyle=':')
+                ax.vlines(x=self.init_values[i][2], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
+                #ax.axvline(self.best_values[i][2], color=colors[i], linestyle=':')
 
             # If constraining logT and b_NT
             if len(self.best_values[i]) == 4:
@@ -923,7 +927,8 @@ class ion_transition:
                         'd$v_c$ = ' + dv_c_str + dv_c_err_str + ' km/s',
                         lw=1, color=colors[i])
 
-                ax.axvline(self.best_values[i][3], color=colors[i], linestyle=':')       
+                ax.vlines(x=self.init_values[i][3], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
+                #ax.axvline(self.best_values[i][3], color=colors[i], linestyle=':')       
 
         ax.plot(self.v, self.best_total_flux,
                 lw=1.5, color='red')
