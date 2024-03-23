@@ -490,6 +490,7 @@ class ion_transition:
 
     def gen_conv_fwhm(self, b, logN_ref):
 
+        # Note: unsure if this is needed anymore
         # Generate a finely sampled convolved profile
         v_mod = np.linspace(self.v[0], self.v[-1], 10*len(self.v))
 
@@ -510,15 +511,16 @@ class ion_transition:
 
         return fwhm_conv
 
-    def get_upper_lim(self, b, logN_min=0, logN_max=14, logN_ref=12, logN_step=0.1, N_trials=5000):
+    def get_upper_lim(self, b, delta_v_chi_sq=100, logN_min=8, logN_max=14, logN_step=0.1, N_trials=3000):
 
         '''
         Method to get 3-sigma upper limit on column density
         '''
 
-        # Isolate a window within twice the FWHM
-        fwhm = self.gen_conv_fwhm(b, logN_ref)
-        idx = (self.v>-fwhm)&(self.v<fwhm)
+        # OUTDATED! Isolate a window within twice the FWHM
+        #fwhm = self.gen_conv_fwhm(b, logN_ref)
+        #idx = (self.v>-fwhm)&(self.v<fwhm)
+        idx = (self.v>-delta_v_chi_sq)&(self.v<delta_v_chi_sq) # Integrate in a fixed window
 
         # Run MC trials
         logN_grid = np.arange(logN_min, logN_max+logN_step, logN_step)
@@ -559,15 +561,15 @@ class ion_transition:
         chi_sq_mean = np.mean(chi_sq_grid, axis=0)
 
         # Convert to PDF, then CDF
-        pdf = np.exp(-0.5*chi_sq_mean)
+        pdf = np.exp(-0.5*chi_sq_mean)*10**logN_grid
         cdf = np.cumsum(pdf)/np.sum(pdf)
 
         # Get PPF
-        ppf = interpolate.interp1d(x=cdf, y=10**logN_grid)
+        ppf = interpolate.interp1d(x=cdf, y=logN_grid)
 
-        self.logN_1sig = np.round(np.log10(ppf([cdf_1sig])[0]), 1)
-        self.logN_2sig = np.round(np.log10(ppf([cdf_2sig])[0]), 1)
-        self.logN_3sig = np.round(np.log10(ppf([cdf_3sig])[0]), 1)
+        self.logN_1sig = np.round(ppf([cdf_1sig])[0], 1)
+        self.logN_2sig = np.round(ppf([cdf_2sig])[0], 1)
+        self.logN_3sig = np.round(ppf([cdf_3sig])[0], 1)
 
         # Print 1-sigma, 2-sigma and 3-sigma upper limit in logN
         print('logN-1sig: {}'.format(self.logN_1sig))
@@ -2297,8 +2299,15 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models, var
             p1 = s_split[0]
             op  = operator_dict[s_split[1]]
             p2 = s_split[2]
+
+            # Scale factor for p2
+            if len(s_split) == 4:
+                sc_p2 = float(s_split[3])
+            else:
+                sc_p2 = 1
+
             # If the condition is satisfied
-            if op(params[p1].value, params[p2].value): # Can we add a constant offset here? Should be possible to do by including an extra keyword for exclude_models
+            if op(params[p1].value, sc_p2*params[p2].value): # Can we add a constant offset here? Should be possible to do by including an extra keyword for exclude_models
                 #print('test')
                 # Render the model improbable
                 resid_flat *= np.inf
