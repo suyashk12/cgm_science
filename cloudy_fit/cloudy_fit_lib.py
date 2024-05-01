@@ -123,36 +123,36 @@ species_names_ions = ['#column density H', 'H+',
                     'Zn', 'Zn+', 'Zn+10', 'Zn+11', 'Zn+12', 'Zn+13', 'Zn+14', 'Zn+15', 'Zn+16', 'Zn+17', 'Zn+18', 'Zn+19', 'Zn+2', 'Zn+20', 'Zn+21', 'Zn+22', 'Zn+23', 'Zn+24', 'Zn+25', 'Zn+26', 'Zn+27', 'Zn+28', 'Zn+29', 'Zn+3', 'Zn+30', 'Zn+4', 'Zn+5', 'Zn+6', 'Zn+7', 'Zn+8', 'Zn+9']
 
 # Number densities of various elements in the Sun relative to hydrogen
-solar_rel_dens_dict = {'Hydrogen': 1.0,
-                    'Helium': 0.1,
-                    'Lithium': 2.04e-09,
-                    'Beryllium': 2.63e-11,
-                    'Boron': 6.17e-10,
-                    'Carbon': 0.000245,
-                    'Nitrogen': 8.51e-05,
-                    'Oxygen': 0.00049,
-                    'Fluorine': 3.02e-08,
-                    'Neon': 0.0001,
-                    'Sodium': 2.14e-06,
-                    'Magnesium': 3.47e-05,
-                    'Aluminium': 2.95e-06,
-                    'Silicon': 3.47e-05,
-                    'Phosphorus': 3.2e-07,
-                    'Sulphur': 1.84e-05,
-                    'Chlorine': 1.91e-07,
-                    'Argon': 2.51e-06,
-                    'Potassium': 1.32e-07,
-                    'Calcium': 2.29e-06,
-                    'Scandium': 1.48e-09,
-                    'Titanium': 1.05e-07,
-                    'Vanadium': 1e-08,
-                    'Chromium': 4.68e-07,
-                    'Manganese': 2.88e-07,
-                    'Iron': 2.82e-05,
-                    'Cobalt': 8.32e-08,
-                    'Nickel': 1.78e-06,
-                    'Copper': 1.62e-08,
-                    'Zinc': 3.98e-08}
+solar_rel_dens_dict = {'H': 1.0,
+                    'He': 0.1,
+                    'Li': 2.04e-09,
+                    'Be': 2.63e-11,
+                    'Bo': 6.17e-10,
+                    'C': 0.000245,
+                    'N': 8.51e-05,
+                    'O': 0.00049,
+                    'F': 3.02e-08,
+                    'Ne': 0.0001,
+                    'Na': 2.14e-06,
+                    'Mg': 3.47e-05,
+                    'Al': 2.95e-06,
+                    'Si': 3.47e-05,
+                    'P': 3.2e-07,
+                    'S': 1.84e-05,
+                    'Cl': 1.91e-07,
+                    'Ar': 2.51e-06,
+                    'K': 1.32e-07,
+                    'Ca': 2.29e-06,
+                    'Sc': 1.48e-09,
+                    'Ti': 1.05e-07,
+                    'V': 1e-08,
+                    'Cr': 4.68e-07,
+                    'Mn': 2.88e-07,
+                    'Fe': 2.82e-05,
+                    'Co': 8.32e-08,
+                    'Ni': 1.78e-06,
+                    'Cu': 1.62e-08,
+                    'Zn': 3.98e-08}
 
 # List of element names
 element_names_dict = {'Hydrogen': 'H',
@@ -759,7 +759,6 @@ def plot_logN_ratio(ax, species_logN_interp, logN_ratio_dict, logN_HI_ref = 12, 
 
     # Generate grid of gas density and column density ratio predictions
     log_hdens_grid, logN_ratio_pred = gen_logN_ratio_pred(species_logN_interp, list(logN_ratio_dict.keys()), 
-                                   
                         logN_HI_ref, log_metals_ref,
                         log_hdens_min, log_hdens_max, log_hdens_grid_size)
     
@@ -1395,3 +1394,251 @@ def log_to_linear_PDF(flatchain, bins=250):
 
     return X, pdf, cdf, cdf_inv_interp
 
+#################################
+#### Utilities for TDP fitting ##
+#################################
+
+def scat_logN_ratio(ax, p_x, p_y, logN_ratio_dict):
+    
+    '''
+    Function to make a scatter plot of measured column density ratios
+
+    ax: axes object onto which scatter the column density ratios
+    p_x: column density ratio for the x-axis
+    p_y: column density ratio for the y-axis
+    logN_ratio_dict: dictionary to column density ratios
+    '''
+
+    # Isolate ion pairs from dictionary
+    s_x = logN_ratio_dict[p_x].split(',')
+    x, dx_lo, dx_hi = float(s_x[0]), -float(s_x[1]), float(s_x[2])
+    
+    s_y = logN_ratio_dict[p_y].split(',')
+    y, dy_lo, dy_hi = float(s_y[0]), -float(s_y[1]), float(s_y[2])
+    
+    # Plot with asymmetric error-bars
+    ax.errorbar(x, y, xerr=[[dx_lo],[dx_hi]],yerr=[[dy_lo],[dy_hi]],
+                     marker='*', markersize=15, markerfacecolor='goldenrod', capsize=3, alpha=.5)
+    
+
+def plot_logN_ratio_track(ax, ion1, ion2, ion3, ion4, logX_dict_TDP_interp,
+                       log_metals_plot, log_hdens_plot,
+                       logT_plot_min, logT_plot_max, dlogT_plot,
+                       logT_mark_min, logT_mark_max, dlogT_mark,
+                       xmin, xmax, ymin, ymax,
+                       ls, horz_al='right', vert_al='top'):
+    
+
+    '''
+    Function to plot TDP model grids to compare with measurement
+
+    ion1: denominator ion for x-axis
+    ion2: numerator ion for x-axis
+    ion3: denominator ion for y-axis
+    ion4: numerator ion for y-axis
+    logX_dict_TDP_interp: interpolated grid of TDP ion fractions
+    log_metals_plot: metallicity for plotting
+    log_hdens_plot: density for plotting
+    logT_plot_min: minimum temperature for plotting the track
+    logT_plot_max: maximum temperature for plotting the track
+    dlogT_plot: step size in temperature for plotting track
+    logT_mark_min: minimum temperature to mark along track
+    logT_mark_max: maximum temperature to mark along track
+    dlogT_mark: step size in temperature when marking track
+    xmin: minimum x-value for plot
+    xmax: maximum x-value for plot
+    ymin: minimum y-value for plot
+    ymax: maxmimum y-value for plot
+    ls: linestyle for track
+    horz_al: horizontal alignment selection for track markers in temperature
+    vert_al: vertical alignment selection for track markers in temperature
+    '''
+    
+    # Set of temperature for plotting the track
+    logT_plot_arr = np.arange(logT_plot_min,logT_plot_max,dlogT_plot)
+
+    # Model access key
+    k = (log_metals_plot,log_hdens_plot,logT_plot_arr)
+    
+    # Access ion fractions at grid points
+    x1 = logX_dict_TDP_interp[ion1](k)
+    x2 = logX_dict_TDP_interp[ion2](k)
+    
+    y1 = logX_dict_TDP_interp[ion3](k)
+    y2 = logX_dict_TDP_interp[ion4](k)
+    
+    # Check if all ion fractions have not fallen off
+    # -5 is a numerical tolerance I found by plotting the ion fractions
+    idx = ((x1>-5)&(x2>-5)&(y1>-5)&(y2>-5))
+    
+    # Plot the track, label its density
+    ax.plot(x2[idx]-x1[idx], 
+            y2[idx]-y1[idx], color='black', linestyle=ls,
+            label=r'$\log (n_\mathrm{{H}}/\mathrm{{cm}}^{{-3}}) = {0:.1f}$'.format(log_hdens_plot))
+    
+    # Label track with temperature
+    for logT in np.arange(logT_mark_min,logT_mark_max,dlogT_mark):
+
+        # Access specific grid point
+        k0 = (log_metals_plot,log_hdens_plot,logT)
+
+        x10 = logX_dict_TDP_interp[ion1](k0)
+        x20 = logX_dict_TDP_interp[ion2](k0)
+
+        y10 = logX_dict_TDP_interp[ion3](k0)
+        y20 = logX_dict_TDP_interp[ion4](k0)
+        
+        s = str(np.round(logT,1))
+        
+        # Check if all ion fractions are valid and within bounds for the plot
+        if x10>-5 and x20>-5 and y10>-5 and y20>-5 and xmin<x20-x10<xmax and ymin<y20-y10<ymax:
+    
+            ax.scatter(x20-x10, y20-y10, color='black', facecolor='none')
+            ax.text(x20-x10, y20-y10, s, fontsize=10, horizontalalignment=horz_al, verticalalignment=vert_al)
+
+    # Set plot bounds
+    ax.set_xlim(xmin,xmax)
+    ax.set_ylim(ymin,ymax)
+
+def get_logN_HI(ion, logN_ion, log_metals, log_hdens, logT_arr, logX_dict_TDP_interp):
+
+    '''
+    Function to predict HI column density given an oxygen ion column density
+
+    ion: name of oxygen ion
+    logN_ion: column density of oxygen ion
+    log_metals: metallicity
+    log_hdens: density
+    logT_arr: temperature grid
+    logX_dict_TDP_interp: interpolated grid of TDP ion fractions
+    '''
+
+    # Access key for models
+    k = (log_metals,log_hdens,logT_arr)
+    # Filter out numerically zero ion fractions
+    idx = logX_dict_TDP_interp[ion](k)>-5
+
+    # Generate logN_HI prediction at valid grid points
+    logN_HI = logN_ion-log_metals-np.log10(solar_rel_dens_dict['O'])-logX_dict_TDP_interp[ion](k)[idx]+logX_dict_TDP_interp['HI'](k)[idx]
+
+    # Return filtered temperatures and logN_HI
+    return logT_arr[idx], logN_HI
+
+def predict_col_dens_TDP(ion, log_metals, log_hdens, logT, logN_HI, logX_dict_TDP_interp):
+    
+    '''
+    Function to produce ionic column density given HI column density
+
+    ion: metal ion of interest
+    log_metals: metallicity
+    log_hdens: density
+    logT: temperature
+    logN_HI: HI column density
+    logX_dict_TDP_interp: interpolated TDP ion fraction grid
+    '''
+
+    # Model access key
+    k = (log_metals,log_hdens,logT)
+    # Element of ion
+    elem = ion_species_dict[ion].split('+')[0]
+
+    # Ionic column density
+    if elem == 'He':
+        logN = logN_HI-logX_dict_TDP_interp['HI'](k)+np.log10(solar_rel_dens_dict[elem])+logX_dict_TDP_interp[ion](k)
+    logN = logN_HI-logX_dict_TDP_interp['HI'](k)+log_metals+np.log10(solar_rel_dens_dict[elem])+logX_dict_TDP_interp[ion](k)
+    
+    return logN
+
+def predict_col_dens_model_TDP(logN_dict, log_metals, log_hdens, logT, logN_HI, logX_dict_TDP_interp, C_O=0, N_O=0):
+
+    '''
+    Function to generate column density predictions for ions with measurements
+
+    logN_dict: dictionary of column density measurements
+    log_metals: metallicity
+    log_hdens: density
+    logT: temperature
+    logN_HI: HI column density
+    logX_dict_TDP_interp: interpolated TDP grid
+    C_O: carbon relative abundance
+    N_O: nitrogen relative abundance
+    '''
+    # Order ions according to ionization potential
+    ions_ordered = [s for s in list(IP_dict.keys()) if s in list(logN_dict.keys())]
+
+    logN_model_arr = np.zeros(len(ions_ordered))
+
+    for i in range(len(ions_ordered)):
+
+        # Ion and corresponding element
+        ion = ions_ordered[i]
+        elem = ion_species_dict[ion].split('+')[0]
+        
+        logN = predict_col_dens_TDP(ion,log_metals,log_hdens,logT,logN_HI,logX_dict_TDP_interp)        
+        if elem == 'C':
+            logN += C_O
+        if elem == 'N':
+            logN += N_O
+
+        logN_model_arr[i] = logN
+
+    return logN_model_arr
+
+def compute_ll(logN_str, y_bar):
+
+    '''
+    Function to compute log likelihood for a data point
+
+    logN_str: string representation of datapoint
+    y_bar: model prediction
+    ''' 
+
+    if logN_str[0]=='<': # Upper limit
+        y = float(logN_str[1:])
+        dy = 1/(3*np.log(10)) # 3-sigma upper limit
+        
+        y_range_min = -10 # Should extend to negative infinity, ideally
+        y_range_step = 0.05
+
+        y_range = np.arange(y_range_min, y+y_range_step, y_range_step)
+
+        # CDF, marginalize over reported values
+        ll = np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/dy**2)))
+        
+    elif logN_str[0]=='>': # Lower limit
+        y = float(logN_str[1:])
+        dy = 1/(3*np.log(10)) # 3-sigma lower limit
+        
+        y_range_max = 21.5 # Should extend to infinity, ideally
+        y_range_step = 0.05
+
+        y_range = np.arange(y, y_range_max+y_range_step, y_range_step)
+
+        # "Q"-function, marginalize over reported values
+        ll = np.log(integrate.simpson(x=y_range, y=np.exp(-.5*(y_range-y_bar)**2/dy**2)))
+
+    else: # Measurement
+        y = float(logN_str.split(',')[0])
+        dy = max(-float(logN_str.split(',')[1]), float(logN_str.split(',')[2]))             
+        ll = -0.5*((y-y_bar)**2/dy**2) # Simple chi-sq for this situation
+
+    return ll
+
+def get_logl_TDP(log_metals, log_hdens, logT, logN_HI, logX_dict_TDP_interp):
+
+    '''
+    Function to return cloud sizes
+
+    log_metals: metallicity
+    log_hdens: density
+    logT: temperature
+    logN_HI: HI column density
+    logX_dict_TDP_interp: interpolated TDP ion fraction grid
+    '''
+    
+    # Model access key
+    k = (log_metals, log_hdens, logT)
+    # kpc correction
+    logl = logN_HI-log_hdens-logX_dict_TDP_interp['HI'](k)+np.log10(3.24078e-19*1e-3)
+    
+    return logl
