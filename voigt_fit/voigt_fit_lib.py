@@ -85,7 +85,7 @@ sigma_0 = 2.654E-2
 atomic_data_table = np.loadtxt('/Users/thepoetoftwilight/Documents/CUBS/pabs0/data/linelists/atom.dat', dtype=str)
 
 # Assuming that we won't run into more than four components
-colors = ['indigo', 'forestgreen', 'darkgoldenrod', 'olive', 'darkgray', 'darkmagenta']    
+colors = ['indigo', 'forestgreen', 'darkgoldenrod', 'dodgerblue', 'darkmagenta', 'olive']    
 
 class ion_transition:
 
@@ -1546,6 +1546,10 @@ class ion(ion_transition):
                                                                     ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
 
 
+
+                # Convert to array
+                sample_values_reshape = np.array(sample_values_reshape)
+
                 if j < n_samples:
                     # For MCMC samples
                     c = 'lightgray'
@@ -1557,10 +1561,18 @@ class ion(ion_transition):
                     c = 'red'
                     alpha=1
                     lw=1.5
-                    
+
+                    if i==0: # Assuming HI has the most number of components, always true?
+                        # Isolate centroids, sort them
+                        median_centroids = np.array(sample_values_reshape)[:,-1]       
+                        median_centroids_sort = np.sort(median_centroids)
+                        # Create dictionary of colors based on sorted centroids
+                        colors_dict = {median_centroids_sort[i]:colors[i] for i in range(len(median_centroids_sort))}
+
                     for q in range(len(sample_comp_fluxes)):
-                        ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors[q], lw=2)
-                        ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors[q], lw=.8)
+                        # Choose color given centroid
+                        ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors_dict[sample_values_reshape[q][-1]], lw=2)
+                        ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors_dict[sample_values_reshape[q][-1]], lw=.8)
                 else:
                     # For MLE
                     self.params_mle_reshape.append(sample_values_reshape)
@@ -1992,6 +2004,10 @@ class ion_summary(ion_suite):
                                                                         ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
                                                                         ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
 
+
+                    # Make into numpy array
+                    sample_values_reshape = np.array(sample_values_reshape)
+
                     if j < n_samples:
                         # For MCMC samples
                         c = 'lightgray'
@@ -2007,11 +2023,18 @@ class ion_summary(ion_suite):
                         alpha=1
                         lw=1.5
 
-                        # Plot velocity centroids from the median samples
-                        for q in range(ion_transition.n_components):
-                            ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors[q], lw=.8)
-                            ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors[q], lw=2)
-                    
+                        if i==0: # Assuming HI has the most number of components, always true?
+                            # Isolate centroids, sort them
+                            median_centroids = np.array(sample_values_reshape)[:,-1]       
+                            median_centroids_sort = np.sort(median_centroids)
+                            # Create dictionary of colors based on sorted centroids
+                            colors_dict = {median_centroids_sort[i]:colors[i] for i in range(len(median_centroids_sort))}
+
+                        for q in range(len(sample_comp_fluxes)):
+                            # Choose color given centroid
+                            ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors_dict[sample_values_reshape[q][-1]], lw=2)
+                            ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors_dict[sample_values_reshape[q][-1]], lw=.8)
+                        
                     else:
                         # For MLE
                         ion_suite.params_mle_reshape.append(sample_values_reshape)

@@ -571,7 +571,7 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = [], l
     if create_fig_ax == True:
         return fig, ax
 
-def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, species_logN_interp, X_alpha_dict = {}):
+def predict_col_dens(logN_dict, logN_HI, log_hdens, log_metals, species_logN_interp, X_alpha_dict = {}):
 
     '''
     Predict column densities for an ordered list of ions given an interpolated CLOUDY grid across N_HI, n_H, and [M/H].
@@ -591,7 +591,7 @@ def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, s
         s = ion_species_dict[ion]
 
         # Get predicted column density for the species from CLOUDY
-        logN_s = species_logN_interp[s]([logN_HI_test, log_hdens_test, log_metals_test])[0]
+        logN_s = species_logN_interp[s]((logN_HI, log_hdens, log_metals))
 
         # If there is departure from solar abundance, shift the predicted column density accordingly
         # s.split('+')[0] is supposed to be the element name. This won't work for hydrogen, or helium, but they're not metals anyway
@@ -601,7 +601,7 @@ def predict_col_dens(logN_dict, logN_HI_test, log_hdens_test, log_metals_test, s
         # Get interpolated column density from CLOUDY grid
         logN_species_test.append(logN_s)
 
-    return logN_species_test
+    return np.array(logN_species_test)
 
 #########################################################
 #### Utilities for processing column density strings ####
@@ -824,7 +824,7 @@ def log_prior_hdens(log_hdens):
     # If the sampled density is within the CLOUDY limits
     # Avoid edges?
     if log_hdens_min<log_hdens<log_hdens_max:
-        return np.log(10**log_hdens)
+        return 0.
     return -np.inf
 
 def log_likelihood_hdens(log_hdens, logN_ratio_dict, species_logN_interp):
@@ -918,9 +918,9 @@ def log_likelihood_hdens(log_hdens, logN_ratio_dict, species_logN_interp):
 #### Utilities for fitting column densities and metallicities ####
 ##################################################################
 
-def get_cloud_size(logN_HI, log_hdens, species_logN_interp, log_metals=-3):
+def get_cloud_size(logN_HI, log_hdens, species_logN_interp, log_metals):
 
-    logN_HII = species_logN_interp['H+']([logN_HI, log_hdens, log_metals])[0]
+    logN_HII = species_logN_interp['H+']((logN_HI, log_hdens, log_metals))
     N_H = 10**logN_HI + 10**logN_HII
 
     l = (N_H/10**log_hdens)*3.24078e-19*1e-3 # in kpc
@@ -953,7 +953,7 @@ def log_prior(params):
             relative_abund *= (log_metals_min<non_solar_dict[k]+log_metals<log_metals_max)
 
         if relative_abund == True:
-            return np.log(10**logN_HI) + np.log(10**log_hdens)
+            return 0.
         else:
             return -np.inf
     return -np.inf
@@ -1084,7 +1084,7 @@ def log_prior_two_phase(params, species_logN_interp):
                         l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
                         l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
                         if l_p1<l_p2<100:
-                            return np.log(10**logN_HI_p1) + np.log(10**log_hdens_p1) + np.log(10**logN_HI_p2) + np.log(10**log_hdens_p2) # Convert log10 to linear, then take natural log
+                            return np.log(10**logN_HI_p1) + np.log(10**logN_HI_p2) # Convert log10 to linear, then take natural log
                         else:
                             return -np.inf
                     else:
@@ -1240,7 +1240,7 @@ def log_prior_three_phase(params, species_logN_interp):
                             l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
                             l_p3 = get_cloud_size(logN_HI_p3, log_hdens_p3, species_logN_interp, log_metals_p3)
                             if l_p1<l_p2<l_p3<100:
-                                return np.log(10**logN_HI_p1) + np.log(10**log_hdens_p1) + np.log(10**logN_HI_p2) + np.log(10**log_hdens_p2) + np.log(10**logN_HI_p3) + np.log(10**log_hdens_p3)
+                                return np.log(10**logN_HI_p1) + np.log(10**logN_HI_p2) + np.log(10**logN_HI_p3)
                             else:
                                 return -np.inf
                         else:
@@ -1537,17 +1537,21 @@ def predict_col_dens_TDP(ion, log_metals, log_hdens, logT, logN_HI, logX_dict_TD
     logX_dict_TDP_interp: interpolated TDP ion fraction grid
     '''
 
-    # Model access key
-    k = (log_metals,log_hdens,logT)
-    # Element of ion
-    elem = ion_species_dict[ion].split('+')[0]
+    if ion == 'HI':
+        return logN_HI
+    else:
+        # Model access key
+        k = (log_metals,log_hdens,logT)
+        # Element of ion
+        elem = ion_species_dict[ion].split('+')[0]
 
-    # Ionic column density
-    if elem == 'He':
         logN = logN_HI-logX_dict_TDP_interp['HI'](k)+np.log10(solar_rel_dens_dict[elem])+logX_dict_TDP_interp[ion](k)
-    logN = logN_HI-logX_dict_TDP_interp['HI'](k)+log_metals+np.log10(solar_rel_dens_dict[elem])+logX_dict_TDP_interp[ion](k)
-    
-    return logN
+
+        # Ionic column density for metals
+        if elem != 'He':
+            logN += log_metals
+        
+        return logN
 
 def predict_col_dens_model_TDP(logN_dict, log_metals, log_hdens, logT, logN_HI, logX_dict_TDP_interp, C_O=0, N_O=0):
 
