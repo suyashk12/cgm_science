@@ -345,7 +345,6 @@ def calc_n_H(uvb_wav_grid, uvb_J_nu, U):
     
     return n_H
 
-
 ######################################################################
 #### Utilities for processing and plotting the CLOUDY model grids ####
 ######################################################################
@@ -1365,6 +1364,71 @@ def log_likelihood_three_phase(params, logN_dict, species_logN_interp):
 ###########################################
 #### Utilities to interpret posteriors ####
 ###########################################
+
+def get_logN_residuals(logN_dict, logN_species_med, logN_species_lo, logN_species_hi):
+
+    '''
+    Function to get residuals of best fit ionization model relative to measurements
+
+    logN_dict: dictionary of measurements
+    logN_species_med: median prediction of best-fit model
+    logN_species_lo: 16th percentile prediction from best-fit model
+    logN_species_hi: 84th percentile prediction from best-fit model
+    '''
+
+    # Obtain errorbars for model prediction
+    dlogN_species_lo = logN_species_med-logN_species_lo
+    dlogN_species_hi = logN_species_hi-logN_species_med
+
+    # Order measurement dictionary ions by ionization potential
+    ions_ordered = [s for s in list(IP_dict.keys()) if s in list(logN_dict.keys())]
+
+    # Dictionary for residuals
+    logN_res_dict = {}
+
+    for i in range(len(ions_ordered)):
+        
+        # Get measurement for ion
+        ion = ions_ordered[i]    
+        logN_str = logN_dict[ion]
+        
+        # In case of upper limit
+        if logN_str[0] == '<':
+            logN_up = float(logN_str[1:]) # Get the upper limit
+            # Just subtract model prediction from upper limit
+            # Round to one decimal place
+            logN_res_dict[ion] = '<' + str(np.round(logN_up-logN_species_med[i],1))
+            
+        # Detection
+        else:
+
+            # Get the measurement value, and errorbars
+            logN_str_split = logN_str.split(',')
+            logN_med = float(logN_str_split[0])
+            dlogN_lo = -float(logN_str_split[1]) # Account for negative sign
+            dlogN_hi = float(logN_str_split[2])
+            
+            # Define median of residual
+            logN_res = logN_med-logN_species_med[i]
+            
+            # Error-bars on residual
+            if logN_res>0: # Data higher than model
+                # Lower error should bring residual closer to zero
+                # For lower error, use upper error of model and lower error of data
+                dlogN_res_lo = np.sqrt(dlogN_lo**2 + dlogN_species_hi[i]**2) 
+                # Likewise, the upper error on residual should take it away from zero
+                dlogN_res_hi = np.sqrt(dlogN_hi**2 + dlogN_species_lo[i]**2)
+            else:
+                # Opposite situation from above, now the upper error should bring closer to zero
+                dlogN_res_lo = np.sqrt(dlogN_hi**2 + dlogN_species_lo[i]**2)
+                dlogN_res_hi = np.sqrt(dlogN_lo**2 + dlogN_species_hi[i]**2)
+                
+            # Build string for residual
+            logN_res_str = '{}, -{}, {}'.format(np.round(logN_res,2), np.round(dlogN_res_lo,2), np.round(dlogN_res_hi,2))
+            # Append to the dictionary
+            logN_res_dict[ion] = logN_res_str
+
+    return logN_res_dict
 
 def get_quantiles(dist):
 
