@@ -1080,9 +1080,14 @@ def log_prior_two_phase(params, species_logN_interp):
             if relative_abund == True:       
                 if log_hdens_p1>log_hdens_p2:
                     if logN_HI_p1>logN_HI_p2:
+                        # Cloud sizes
                         l_p1 = get_cloud_size(logN_HI_p1, log_hdens_p1, species_logN_interp, log_metals_p1)
                         l_p2 = get_cloud_size(logN_HI_p2, log_hdens_p2, species_logN_interp, log_metals_p2)
-                        if l_p1<l_p2<100:
+                        # Cloud size limits for p2
+                        N_H_sonic = 1e17
+                        l_p2_S = 0.03*(10**log_hdens_p2/1e-3)**-1 # in kpc
+                        l_p2_J = 40*(10**log_hdens_p2/1e-3)**-0.5 # also in kpc
+                        if l_p1<l_p2 and l_p2_S<l_p2<l_p2_J: # Denser phase more compact, diffuse phase stable
                             return np.log(10**logN_HI_p1) + np.log(10**logN_HI_p2) # Convert log10 to linear, then take natural log
                         else:
                             return -np.inf
