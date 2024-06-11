@@ -500,7 +500,7 @@ def plot_linewidth_obs(b_dict, fig = None, ax = None, label_ions = True, gray_ou
     if create_fig_ax == True:
         return fig, ax
 
-def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = [], label_ions=True, fs=16):
+def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = [], label_ions=True, fs=16, dy=0.2, c_dy=1.5):
 
     '''
     Method to plot observed column densities of species from VP fit
@@ -543,16 +543,18 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = [], l
         # Upper limit
         elif logN_str[0] == '<':
             logN_lim = float(logN_str[1:])
-            ax.errorbar(x=i, y=logN_lim, yerr=0.3, uplims=True, color=c, fmt='o', markersize=3)
+            plot, caps, bars = ax.errorbar(x=i, y=logN_lim, yerr=dy, uplims=True, color=c, fmt='o', markersize=3, elinewidth=0, markerfacecolor='None') # Make marker and spear
+            caps[0].set_fillstyle('none')
+            ax.errorbar(x=i, y=logN_lim, xerr=None, yerr=[[c_dy*dy],[0]], color=c, fmt='o', markersize=0, capsize=0) # Connect them
             if label_ions==True:
                 ax.text(x=i, y=logN_lim, s=ion, color=c, 
                 horizontalalignment='center', verticalalignment='bottom', fontsize=fs)
         
         # Lower limit
-        # Not implemented yet
+        # NOT implemented yet
         elif logN_str[0] == '>':
             logN_arr = np.array(logN_str[1:].split(','), dtype=float)
-            ax.errorbar(x=i, y=logN_arr[0], yerr=0.3, lolims=True, color=c, fmt='o', markersize=3)
+            ax.errorbar(x=i, y=logN_arr[0], yerr=dy, lolims=True, color=c, fmt='o', markersize=3)
             if label_ions==True:
                 ax.text(x=i, y=logN_arr[0], s=ion, color=c, 
                         horizontalalignment='center', verticalalignment='top', fontsize=fs)
@@ -1416,17 +1418,12 @@ def get_logN_residuals(logN_dict, logN_species_med, logN_species_lo, logN_specie
             # Define median of residual
             logN_res = logN_med-logN_species_med[i]
             
+
             # Error-bars on residual
-            if logN_res>0: # Data higher than model
-                # Lower error should bring residual closer to zero
-                # For lower error, use upper error of model and lower error of data
-                dlogN_res_lo = np.sqrt(dlogN_lo**2 + dlogN_species_hi[i]**2) 
-                # Likewise, the upper error on residual should take it away from zero
-                dlogN_res_hi = np.sqrt(dlogN_hi**2 + dlogN_species_lo[i]**2)
-            else:
-                # Opposite situation from above, now the upper error should bring closer to zero
-                dlogN_res_lo = np.sqrt(dlogN_hi**2 + dlogN_species_lo[i]**2)
-                dlogN_res_hi = np.sqrt(dlogN_lo**2 + dlogN_species_hi[i]**2)
+            # If data>model, lower error on data and upper error on model brings the difference closer to zero
+            dlogN_res_lo = np.sqrt(dlogN_lo**2 + dlogN_species_hi[i]**2)
+            # If data<model, upper error on data and lower error on model brings the difference closer to zero
+            dlogN_res_hi = np.sqrt(dlogN_hi**2 + dlogN_species_lo[i]**2)
                 
             # Build string for residual
             logN_res_str = '{}, -{}, {}'.format(np.round(logN_res,2), np.round(dlogN_res_lo,2), np.round(dlogN_res_hi,2))
