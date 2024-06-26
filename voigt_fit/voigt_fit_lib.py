@@ -358,7 +358,7 @@ class ion_transition:
             return fig, axes
 
     def plot_ion_transition_spec(self, fig = None, ax = None, draw_masks = True, 
-                                 draw_cont_bounds = True, label_axes=True, label_ion=True):
+                                 draw_cont_bounds = True, label_axes=True, label_ion=True, lw=0.5, flux_color='black'):
 
         '''
         Method to draw the continuum normalized spectrum of the transition
@@ -377,8 +377,8 @@ class ion_transition:
             fig, ax = plt.subplots(1, figsize=(7,4))
 
         # Repeat the same process, but for the renormalized spectrum
-        ax.step(self.v, self.flux_norm, color='black', where='mid', lw=1.5)
-        ax.step(self.v, self.err_norm, color='cyan', where='mid', lw=1.5)   
+        ax.step(self.v, self.flux_norm, color=flux_color, where='mid', lw=lw)
+        ax.step(self.v, self.err_norm, color='cyan', where='mid', lw=lw)   
 
         # Draw the masked regions
         if(draw_masks == True):
@@ -617,7 +617,8 @@ class ion_transition:
         self.init_comp_fluxes = init_comp_fluxes
         self.init_total_flux = init_total_flux
 
-    def plot_ion_transition_init_fit(self, fig=None, ax=None, draw_masks=True, legend=True, label_axes=True):
+    def plot_ion_transition_init_fit(self, fig=None, ax=None, draw_masks=True, legend=True, label_axes=True, colors=colors, linestyles=['-','-','-','-'], lw=0.5,
+                                     flux_color='black'):
 
         '''
         Method to draw the initial Voigt profile for the ionic transition
@@ -636,8 +637,8 @@ class ion_transition:
 
         # First draw the background spectrum
 
-        ax.step(self.v, self.flux_norm, color='black', where='mid', lw=1.5)
-        ax.step(self.v, self.err_norm, color='cyan', where='mid', lw=1.5)
+        ax.step(self.v, self.flux_norm, color=flux_color, where='mid', lw=lw)
+        ax.step(self.v, self.err_norm, color='cyan', where='mid', lw=lw)
 
         # Shade masked regions, if indicated
         if(draw_masks == True):
@@ -660,7 +661,7 @@ class ion_transition:
                             label='log$N$ = ' + str(np.round(self.init_values[i][0], 2)) + '\n' +
                             '$b$ = ' + str(np.round(self.init_values[i][1], 2)) + ' km/s' + '\n' +
                             'd$v_c$ = ' + str(np.round(self.init_values[i][2], 2)) + ' km/s',
-                            lw=1, color=colors[i])
+                            lw=lw, color=colors[i], ls=linestyles[i])
 
                     # Also indicate the velocity centroid
                     ax.vlines(x=self.init_values[i][2], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
@@ -683,7 +684,7 @@ class ion_transition:
 
             # Plot the combined flux
             ax.plot(self.v, self.init_total_flux,
-                    lw=1.5, color='red')
+                    lw=lw, color='red')
 
         # Draw reference lines
         ax.axhline(0, color='red', linestyle=':')
@@ -1935,7 +1936,7 @@ class ion_summary(ion_suite):
                 ion_transition = ion_suite.ion_transitions_list[i]
                 param_names = [l for l in list(ion_suite.result_emcee.params.valuesdict().keys()) if 'it{}c'.format(i+1) in l]
                 
-                ion_transition.plot_ion_transition_spec(fig=fig, ax=ax, label_axes=False)
+                ion_transition.plot_ion_transition_spec(fig=fig, ax=ax, label_axes=False, lw=0.5)
                 
                 for j in range(n_samples+2):
                 
@@ -2021,7 +2022,7 @@ class ion_summary(ion_suite):
                         ion_suite.param_errs_hi_reshape.append(sample_values_errs_hi_reshape)
                         c = 'red'
                         alpha=1
-                        lw=1.5
+                        lw=.5
 
                         if i==0: # Assuming HI has the most number of components, always true?
                             # Isolate centroids, sort them
@@ -2032,8 +2033,8 @@ class ion_summary(ion_suite):
 
                         for q in range(len(sample_comp_fluxes)):
                             # Choose color given centroid
-                            ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors_dict[sample_values_reshape[q][-1]], lw=2)
-                            ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors_dict[sample_values_reshape[q][-1]], lw=.8)
+                            ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors_dict[sample_values_reshape[q][-1]], lw=1)
+                            ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors_dict[sample_values_reshape[q][-1]], lw=.5)
                         
                     else:
                         # For MLE

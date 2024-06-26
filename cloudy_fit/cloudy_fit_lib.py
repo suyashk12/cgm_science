@@ -748,7 +748,15 @@ def gen_logN_ratio_pred(species_logN_interp, ion_pairs_list, logN_HI_ref, log_me
     return log_hdens_grid, logN_ratio_pred
 
 def plot_logN_ratio(ax, species_logN_interp, logN_ratio_dict, logN_HI_ref = 12, log_metals_ref = -3,
-                             log_hdens_min = -5, log_hdens_max = 1, log_hdens_grid_size = 5000):
+                    log_hdens_min = -5, log_hdens_max = 1, log_hdens_grid_size = 5000,
+                    colors = ['black', 'darkgray', 'firebrick', 'tan', 'deepskyblue', 
+                            'cyan', 'green', 'yellowgreen', 'darkmagenta', 'orchid',
+                            'darkorange', 'orangered', 'goldenrod', 'indigo', 'blueviolet',
+                            'crimson'],
+                    linestyles = ['-', '-', '-', '-', '-', 
+                            '-', '-', '-', '-', '-',
+                            '-', '-', '-', '-', '-',
+                            '-'], label=True):
 
     '''
     Method to overplot predicted and observed column density ratios as a function of gas density
@@ -763,11 +771,6 @@ def plot_logN_ratio(ax, species_logN_interp, logN_ratio_dict, logN_HI_ref = 12, 
                         logN_HI_ref, log_metals_ref,
                         log_hdens_min, log_hdens_max, log_hdens_grid_size)
     
-    # List of colors
-    colors = ['black', 'darkgray', 'firebrick', 'tan', 'deepskyblue', 
-              'cyan', 'green', 'yellowgreen', 'darkmagenta', 'orchid',
-              'darkorange', 'orangered', 'goldenrod', 'indigo', 'blueviolet',
-              'crimson']
 
     # Plot the predicted column density ratios
     for i in range(len(logN_ratio_pred)):
@@ -775,7 +778,7 @@ def plot_logN_ratio(ax, species_logN_interp, logN_ratio_dict, logN_HI_ref = 12, 
         ion_pair_str = list(logN_ratio_pred.keys())[i]
         
         # Plot model predictions
-        ax.plot(log_hdens_grid, logN_ratio_pred[ion_pair_str], label=ion_pair_str, c=colors[i])
+        ax.plot(log_hdens_grid, logN_ratio_pred[ion_pair_str], label=ion_pair_str, c=colors[i], ls=linestyles[i])
         
     # Plot the observed column density ratios
     for i in range(len(logN_ratio_dict)):
@@ -804,13 +807,14 @@ def plot_logN_ratio(ax, species_logN_interp, logN_ratio_dict, logN_HI_ref = 12, 
         mask = np.ones(len(log_hdens_grid))
         mask[~idx] = np.nan
             
-        ax.plot(log_hdens_grid*mask, logN_ratio_pred[ion_pair_str]*mask, lw=4, c=colors[i])
+        ax.plot(log_hdens_grid*mask, logN_ratio_pred[ion_pair_str]*mask, lw=4, c=colors[i], ls=linestyles[i])
     
     ax.set_xlabel(r'$\log (n_{\mathrm{H}}/\mathrm{cm}^{-3})$')
     ax.set_ylabel(r'$\log (\mathrm{Column Density Ratio})$')
 
-    ax.legend(loc='right', bbox_to_anchor=(1.38, 0.5),
-            fancybox=True, shadow=True, ncol=1)
+    if label==True:
+        ax.legend(loc='right', bbox_to_anchor=(1.38, 0.5),
+                fancybox=True, shadow=True, ncol=1)
     
 ###########################################
 #### Utilities for fitting gas density ####
