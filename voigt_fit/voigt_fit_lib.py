@@ -2055,7 +2055,7 @@ class ion_summary(ion_suite):
             #plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
             #plt.minorticks_off()
 
-            ax_label.set_xlabel('Relative Velocity (km/s)', labelpad=label_axes_pad_x, fontsize=20)
+            ax_label.set_xlabel(r'Relative Velocity (km s ${}^{-1}$)', labelpad=label_axes_pad_x, fontsize=20)
             ax_label.set_ylabel('Flux (continuum normalized)', labelpad=label_axes_pad_y, fontsize=20)
 
         plt.subplots_adjust(wspace=0, hspace=0)      
