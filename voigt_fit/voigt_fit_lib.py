@@ -591,7 +591,7 @@ class ion_transition:
 
         print('Integration window: ' + '[{}, {}]'.format(int(np.round(v_min)), int(np.round(v_max))))
         print('EW, 1sig: {}, {}'.format(int(np.round(EW)), int(np.round(EW_1sig))))
-        print('EW-3sig: {}'.format(int(np.round(3*EW_1sig))))
+        print('EW-3sig: {:.3f}'.format(np.round(3*EW_1sig,3)))
 
     def init_ion_transition(self, init_values, lsf_convolve = True):
 
