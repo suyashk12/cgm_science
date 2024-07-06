@@ -396,7 +396,8 @@ class ion_transition:
             ax.set_ylabel('Flux (continuum normalized)')
 
         if label_ion == True:
-            ax.text(self.v[0]+30, 0.25, self.name+ ', ' + self.instrument, fontsize=15, weight='bold')
+            ax.text(self.v[0]+30, 0.25, self.name, fontsize=15, weight='bold')
+            ax.text(self.v[-1]-30, 0.25, self.instrument, fontsize=15, weight='bold', horizontalalignment='right')
 
         #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name+ ', ' + self.instrument, fontsize=12)
         #ax.text(self.v[-1]-120, np.max(self.err_norm)+.1, '$\lambda = $' + str(np.round(self.wav0_obs,2)) + 'Å', fontsize=12)
@@ -510,6 +511,59 @@ class ion_transition:
         fwhm_conv = 2*tau_2_v([tau_fwhm_conv])[0]
 
         return fwhm_conv
+
+    def get_upper_lim_data(self, b, v_c, v_min=-100, v_max=100, logN_min=8, logN_max=14, logN_step=0.1, return_grids=False):
+
+        '''
+        Method to get 3-sigma upper limit on column density on the original spectrum
+        '''
+
+        # OUTDATED! Isolate a window within twice the FWHM
+        #fwhm = self.gen_conv_fwhm(b, logN_ref)
+        #idx = (self.v>-fwhm)&(self.v<fwhm)
+        idx = (self.v>v_min)&(self.v<v_max) # Integrate in a fixed window
+
+        # Run MC trials
+        logN_grid = np.arange(logN_min, logN_max+logN_step, logN_step)
+
+        # Create pristine spectra
+        model_grid = np.zeros((len(logN_grid), len(self.v)))
+
+        for i in range(len(logN_grid)):
+            model_grid[i,:] = comp_model_spec_gen(self.v, np.array([[logN_grid[i], b, v_c]]), 
+                                self.wav0_rest, self.f, self.gamma, self.A,
+                                True,
+                                self.lsf, self.v_lsf)[1]
+            
+
+        # Evaluate chi-sq
+        chi_sq_grid = np.zeros(len(logN_grid))
+
+        for j in range(len(logN_grid)):
+                
+            raw_spec = self.flux_norm[idx]
+            model_spec = model_grid[j,:][idx]
+            err_spec = self.err_norm[idx]
+            chi_sq_grid[j] = np.sum((raw_spec-model_spec)**2/err_spec**2)
+
+        # Convert to PDF, then CDF
+        pdf = np.exp(-0.5*chi_sq_grid)*10**logN_grid
+        cdf = np.cumsum(pdf)/np.sum(pdf)
+
+        # Get PPF
+        ppf = interpolate.interp1d(x=cdf, y=logN_grid)
+
+        self.logN_1sig = np.round(ppf([cdf_1sig])[0], 1)
+        self.logN_2sig = np.round(ppf([cdf_2sig])[0], 1)
+        self.logN_3sig = np.round(ppf([cdf_3sig])[0], 1)
+
+        # Print 1-sigma, 2-sigma and 3-sigma upper limit in logN
+        print('logN-1sig: {}'.format(self.logN_1sig))
+        print('logN-2sig: {}'.format(self.logN_2sig))
+        print('logN-3sig: {}'.format(self.logN_3sig))
+
+        if return_grids == True:
+            return logN_grid, chi_sq_grid, pdf, cdf
 
     def get_upper_lim(self, b, delta_v_chi_sq=100, logN_min=8, logN_max=14, logN_step=0.1, N_trials=3000):
 
@@ -697,7 +751,9 @@ class ion_transition:
             ax.set_ylabel('Flux (continuum normalized)')
 
         #  Indicate the transition properly in the plot
-        ax.text(self.v[0]+30, 0.25, self.name+ ', ' + self.instrument, fontsize=15, weight='bold')
+        ax.text(self.v[0]+30, 0.25, self.name, fontsize=15, weight='bold')
+        ax.text(self.v[-1]-30, 0.25, self.instrument, fontsize=15, weight='bold', horizontalalignment='right')
+
         #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name, fontsize=12)
 
         # Indicate legend if requested

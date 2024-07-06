@@ -543,7 +543,7 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = [], l
         # Upper limit
         elif logN_str[0] == '<':
             logN_lim = float(logN_str[1:])
-            plot, caps, bars = ax.errorbar(x=i, y=logN_lim, yerr=dy, uplims=True, color=c, fmt='o', markersize=3, elinewidth=0, markerfacecolor='None') # Make marker and spear
+            _, caps, _ = ax.errorbar(x=i, y=logN_lim, yerr=dy, uplims=True, color=c, fmt='o', markersize=3, elinewidth=0, markerfacecolor='None') # Make marker and spear
             caps[0].set_fillstyle('none')
             ax.errorbar(x=i, y=logN_lim, xerr=None, yerr=[[c_dy*dy],[0]], color=c, fmt='o', markersize=0, capsize=0) # Connect them
             if label_ions==True:
@@ -553,8 +553,10 @@ def plot_column_densities_obs(logN_dict, fig = None, ax = None, gray_out = [], l
         # Lower limit
         # NOT implemented yet
         elif logN_str[0] == '>':
-            logN_arr = np.array(logN_str[1:].split(','), dtype=float)
-            ax.errorbar(x=i, y=logN_arr[0], yerr=dy, lolims=True, color=c, fmt='o', markersize=3)
+            logN_lim = float(logN_str[1:])
+            _, caps, _ = ax.errorbar(x=i, y=logN_lim, yerr=dy, lolims=True, color=c, fmt='o', markersize=3, elinewidth=0, markerfacecolor='None') # Make marker and spear
+            caps[0].set_fillstyle('none')
+            ax.errorbar(x=i, y=logN_lim, xerr=None, yerr=[[0],[c_dy*dy]], color=c, fmt='o', markersize=0, capsize=0) # Connect them
             if label_ions==True:
                 ax.text(x=i, y=logN_arr[0], s=ion, color=c, 
                         horizontalalignment='center', verticalalignment='top', fontsize=fs)
@@ -1409,6 +1411,13 @@ def get_logN_residuals(logN_dict, logN_species_med, logN_species_lo, logN_specie
             # Just subtract model prediction from upper limit
             # Round to one decimal place
             logN_res_dict[ion] = '<' + str(np.round(logN_up-logN_species_med[i],1))
+
+        # In case of lower limit
+        elif logN_str[0] == '>':
+            logN_lo = float(logN_str[1:]) # Get the upper limit
+            # Just subtract model prediction from upper limit
+            # Round to one decimal place
+            logN_res_dict[ion] = '>' + str(np.round(logN_lo-logN_species_med[i],1))
             
         # Detection
         else:
