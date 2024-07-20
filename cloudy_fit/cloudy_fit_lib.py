@@ -433,7 +433,9 @@ def read_col_file(rootdir, filename):
 #### Utilities for plotting column densities and linewidths ####
 ################################################################
 
-def plot_linewidth_obs(b_dict, fig = None, ax = None, label_ions = True, gray_out = [], fs=16):
+def plot_linewidth_obs(b_dict, fig = None, ax = None, label_ions = True, gray_out = [], 
+                       scatter_out = [], scatter_pos = 0.5,
+                       fs=16):
 
     '''
     Method to plot observed linewidths from VP fit
@@ -464,12 +466,19 @@ def plot_linewidth_obs(b_dict, fig = None, ax = None, label_ions = True, gray_ou
         # Detection
         if b_str[0] != '<' and b_str[0] != '>':
             b_arr = np.array(b_str.split(','), dtype=float)
-            ax.scatter(i, b_arr[0], s=3, color=c)
-            ax.errorbar(x=i, y=b_arr[0], yerr=[[-b_arr[1]],[b_arr[2]]], color=c, linestyle='None',
-                    fmt='o', markersize=3, capsize=4)
-            if label_ions == True:
-                ax.text(x=i, y=b_arr[0]+b_arr[2], s=ion, color=c, 
-                horizontalalignment='center', verticalalignment='bottom', fontsize=fs)
+
+            if ion in scatter_out:
+                ax.scatter(i, b_arr[0], s=10, color=c, facecolor='none')
+                if label_ions == True:
+                    ax.text(x=i, y=b_arr[0]+scatter_pos, s=ion, color=c, 
+                    horizontalalignment='center', verticalalignment='bottom', fontsize=fs)
+            else:
+                ax.scatter(i, b_arr[0], s=3, color=c)
+                ax.errorbar(x=i, y=b_arr[0], yerr=[[-b_arr[1]],[b_arr[2]]], color=c, linestyle='None',
+                        fmt='o', markersize=3, capsize=4)
+                if label_ions == True:
+                    ax.text(x=i, y=b_arr[0]+b_arr[2], s=ion, color=c, 
+                    horizontalalignment='center', verticalalignment='bottom', fontsize=fs)
         
         # Upper limit
         elif b_str[0] == '<':
