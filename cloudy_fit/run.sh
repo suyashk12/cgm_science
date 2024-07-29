@@ -1,0 +1,1 @@
+/Users/thepoetoftwilight/Documents/CUBS/c22.01/source/cloudy.exe -r $1
