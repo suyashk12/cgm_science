@@ -1387,20 +1387,14 @@ def log_likelihood_three_phase(params, logN_dict, species_logN_interp):
 #### Utilities to interpret posteriors ####
 ###########################################
 
-def get_logN_residuals(logN_dict, logN_species_med, logN_species_lo, logN_species_hi):
+def get_logN_residuals(logN_dict, logN_species_med):
 
     '''
     Function to get residuals of best fit ionization model relative to measurements
 
     logN_dict: dictionary of measurements
     logN_species_med: median prediction of best-fit model
-    logN_species_lo: 16th percentile prediction from best-fit model
-    logN_species_hi: 84th percentile prediction from best-fit model
     '''
-
-    # Obtain errorbars for model prediction
-    dlogN_species_lo = logN_species_med-logN_species_lo
-    dlogN_species_hi = logN_species_hi-logN_species_med
 
     # Order measurement dictionary ions by ionization potential
     ions_ordered = [s for s in list(IP_dict.keys()) if s in list(logN_dict.keys())]
@@ -1439,16 +1433,9 @@ def get_logN_residuals(logN_dict, logN_species_med, logN_species_lo, logN_specie
             
             # Define median of residual
             logN_res = logN_med-logN_species_med[i]
-            
-
-            # Error-bars on residual
-            # If data>model, lower error on data and upper error on model brings the difference closer to zero
-            dlogN_res_lo = np.sqrt(dlogN_lo**2 + dlogN_species_hi[i]**2)
-            # If data<model, upper error on data and lower error on model brings the difference closer to zero
-            dlogN_res_hi = np.sqrt(dlogN_hi**2 + dlogN_species_lo[i]**2)
                 
             # Build string for residual
-            logN_res_str = '{}, -{}, {}'.format(np.round(logN_res,2), np.round(dlogN_res_lo,2), np.round(dlogN_res_hi,2))
+            logN_res_str = '{}, -{}, {}'.format(np.round(logN_res,2), np.round(dlogN_lo,2), np.round(dlogN_hi,2))
             # Append to the dictionary
             logN_res_dict[ion] = logN_res_str
 

@@ -65,7 +65,7 @@ cdf_3sig = 0.9987
 # FUV: delta_v of 6 km/s from uncalibrated wavelength using MW CII*1335 and delta_v of 7 km/s from NI1200 in COS FUV compared to HIRES MW H&K
 # STIS: delta_v of 2 km/s from uncalibrated wavelength using MW FeII2344 and FeII2586 in COS STIS compared to HIRES Ca H&K
 # NUV: delta_v of 2 km/s from uncalibrated wavelength using z=1.16591 HI 918 and collective fitting of HI (previous lines from calibrated STIS) and z=1.09454 CIII977 in STIS and NUV
-instruments_dict = {'FUV': 0, 'NUV': 1, 'STIS': 2, 'HIRES': 3}
+instruments_dict = {'COS FUV': 0, 'COS NUV': 1, 'STIS': 2, 'HIRES': 3}
 #delta_wav_list = [0, 0, 0, 0]
 delta_wav_list = [-0.016379252766527918, 0, 0, 0]
 #delta_wav_list = [0.027361350561960006, 0.020175157458413, 0.016434071712905403, 0.016764412856649667]
@@ -397,7 +397,7 @@ class ion_transition:
 
         if label_ion == True:
             ax.text(self.v[0]+30, 0.25, self.name, fontsize=15, weight='bold')
-            ax.text(self.v[-1]-30, 0.25, self.instrument, fontsize=15, weight='bold', horizontalalignment='right')
+            ax.text(self.v[-1]-30, 0.25, self.instrument.split(' ')[0], fontsize=15, weight='bold', horizontalalignment='right')
 
         #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name+ ', ' + self.instrument, fontsize=12)
         #ax.text(self.v[-1]-120, np.max(self.err_norm)+.1, '$\lambda = $' + str(np.round(self.wav0_obs,2)) + 'Å', fontsize=12)
@@ -752,7 +752,7 @@ class ion_transition:
 
         #  Indicate the transition properly in the plot
         ax.text(self.v[0]+30, 0.25, self.name, fontsize=15, weight='bold')
-        ax.text(self.v[-1]-30, 0.25, self.instrument, fontsize=15, weight='bold', horizontalalignment='right')
+        ax.text(self.v[-1]-30, 0.25, self.instrument.split(' ')[0], fontsize=15, weight='bold', horizontalalignment='right')
 
         #ax.text(self.v[0]+30, np.max(self.err_norm)+.1, self.name, fontsize=12)
 
