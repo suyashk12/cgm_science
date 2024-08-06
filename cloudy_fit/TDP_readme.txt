@@ -17,12 +17,18 @@ Running scripts - Make sure you can run basic scripts like the Smoke Test (https
 as well as scripts in Hazy1 (available under c2x.xx/docs/hazy1.pdf under your installed CLOUDY folder). 
 The general principle for running a script is to first save it as “x.in”, where x is your script name, 
 and also have a shell script file in the same folder (see run.sh in https://github.com/suyashk12/cgm_science/blob/main/cloudy_fit/run.sh). 
+Be sure to modify the path in run.sh to the location where you have installed CLOUDY.
 The script will then be run using the command "./run.sh x" in the Command Line (make sure you are in the same folder as your script when executing this command). 
 The script may save output (with extensions of “.out”, etc.) in the folder where the script was executed. 
 
-Sample TDP script - A sample time-dependent photoionization (TDP) script can be found on this publicly hosted GitHub repository under the name 
-"isochoric_cool.in" (https://github.com/suyashk12/cgm_science/blob/main/cloudy_fit/isochoric_cool.in). 
-Make sure you also have the shell script run.sh in the same directory when you execute CLOUDY! 
+Sample TDC script - A time-dependent collisional (TDC) ionization script can be found on this publicly hosted GitHub repository under the name 
+"cp-cool-1keV.in" (https://github.com/suyashk12/cgm_science/blob/main/cloudy_fit/cp-cool-1keV.in), and was provided in Section 14.3 of Hazy1 (page 160).
+Make sure you also have the shell script run.sh in the same directory when you execute CLOUDY, and that you can run this script
+before running a TDP script!
+
+Sample TDP script - A sample time-dependent photoionization (TDP) script can be found 
+"isochoric_cool.in" (https://github.com/suyashk12/cgm_science/blob/main/cloudy_fit/isochoric_cool.in).
+Make sure you can run this before proceeding to build a model grid!
 Note about UVB - available options for the extragalactic UVB in CLOUDY include HM05 (Haardt and Madau 2001), HM12 (Haardt and Madau 2012), KS19 (Khaire and Srianand 2019). 
 However, this work also considers photoionization models built with FG20 (Faucher-Giguere 2020), which is not offered by CLOUDY as a default option. 
 To use the FG20 UVB in photoionization calculations, see https://galaxies.northwestern.edu/uvb-fg20/.
