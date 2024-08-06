@@ -1,7 +1,7 @@
 
------------------
-Installing CLOUDY
------------------
+---------------------
+| Installing CLOUDY |
+---------------------
 
 Introduction - CLOUDY is a photoionization code that can simulate astrophysical plasmas. 
 To install this software, check out the “Getting started with Cloudy section” on the home page (https://gitlab.nublado.org/cloudy/cloudy/-/wikis/home).
@@ -9,9 +9,9 @@ To install this software, check out the “Getting started with Cloudy section�
 Note about versions - The models in the paper were built using C22.01. 
 More recent versions are available. Note that the atomic physics may vary between different versions, among other things.
 
--------------------
-Run CLOUDY scripts
--------------------
+----------------------
+| Run CLOUDY scripts |
+----------------------
 
 Running scripts - Make sure you can run basic scripts like the Smoke Test (https://gitlab.nublado.org/cloudy/cloudy/-/wikis/Smoke%20Test) 
 as well as scripts in Hazy1 (available under c2x.xx/docs/hazy1.pdf under your installed CLOUDY folder). 
@@ -35,6 +35,10 @@ Note about UVB - available options for the extragalactic UVB in CLOUDY include H
 However, this work also considers photoionization models built with FG20 (Faucher-Giguere 2020), which is not offered by CLOUDY as a default option. 
 To use the FG20 UVB in photoionization calculations, see https://galaxies.northwestern.edu/uvb-fg20/.
 
+---------------------------------------------
+| Build and parse CLOUDY grids using Python |
+---------------------------------------------
+
 Building a model grid - After confirming that you can run the sample TDP script, choose a directory where you’d like to build your model grid for a range of densities 
 and metallicities. Then, run the Jupyter Notebook "non_eqm_scripts.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_scripts_write.ipynb). 
 Make sure rootdir is set to the directory where you’d like to build your model grid. You can specify the list of metallicities and densities 
@@ -47,9 +51,6 @@ allow you to do so. Switch your command line directory to r/PI/TDP_isochoric, an
 finish (~2 min per script on a Macbook Pro M2 chip), but at the end, you should have output ion fractions (saved with extension “.elem”, 
 with elem = carb, nit, oxy, etc.) in the directory for each grid point.
 
----------------------------------
-Parse CLOUDY output using Python
----------------------------------
 
 Parsing and interpolating the output files - having obtained ion fractions for each grid point, you can use the notebook 
 "TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to create a pickled version 
