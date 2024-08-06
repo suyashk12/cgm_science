@@ -57,4 +57,5 @@ of ion fraction grids across a range of densities and metallicities.
 Find a sample saved grid used for this paper at https://drive.google.com/drive/folders/1crTCXT0ydxPIBccDyS9nuJMD5E2rbY41?usp=sharing.
 
 Comparing with observations - see the notebook z=1.26_TDP_fit.ipynb (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/z%3D1.26_TDP_fit.ipynb) 
-for a tutorial on how to compare TDP model grids with Voigt profile measurements.
+for a tutorial on how to compare TDP model grids with Voigt profile measurements. You'll have to ensure that the Python emcee library 
+is installed (https://emcee.readthedocs.io/en/stable/user/install/).
