@@ -1,0 +1,18 @@
+cmb z=1
+table hm12 z=1
+coronal 6 vary
+grid 4 8 0.02
+metal -1 log
+stop column density 15
+set dr 0
+stop zone 1
+hden -4.0
+iterate 2
+double  ## mimic two-sided photoionization
+set save prefix "PIE_frac"
+save grid ".grd"
+save element hydrogen ".hyd" last no hash
+save element carbon ".carb" last no hash
+save element nitrogen ".nit" last no hash
+save element oxygen ".oxy" last no hash
+                

@@ -1,6 +1,11 @@
 
 This is a tutorial for creating time-dependent photoionization scripts for a range of gas densities and metallicities using CLOUDY.
-If you run into errors or have any questions, please reach out to me at suyashk@uchicago.edu!
+
+If you would like to use the exact a TDP grid using FG20 at z=1, you can download it here -
+https://drive.google.com/drive/folders/1crTCXT0ydxPIBccDyS9nuJMD5E2rbY41?usp=sharing
+
+If you would like to build your own grid, please follow the tutorial below. 
+To report errors or ask any questions, please reach out to me at suyashk@uchicago.edu, thank you!
 
 ---------------------
 | Installing CLOUDY |
@@ -44,23 +49,24 @@ To use the FG20 UVB in photoionization calculations, see https://galaxies.northw
 
 Building a model grid - After confirming that you can run the sample TDP script, choose a directory where you’d like to build your model grid for a range of densities 
 and metallicities. Then, run the Jupyter Notebook "non_eqm_scripts.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_scripts_write.ipynb). 
-Make sure rootdir is set to the directory where you’d like to build your model grid. You can specify the list of metallicities and densities 
-for which you’d like to run TDP models. You can also specify the UVB(s) and initial temperature(s) for which you’d like to run the script. 
+Make sure rootdir is set to the directory where you’d like to build your model grid and 
+set cloudy_path to where cloudy.exe is saved in your computer (see sections above). Within the Jupyter notebook,
+you can specify the list of metallicities and densities for which you’d like to run TDP models. 
+You can also specify the UVB(s) and initial temperature(s) for which you’d like to run the script. 
 If running TDP models is all you are concerned with, you need only run the first five code cells - i.e. till the cell below
-“TDP (with fixed densities)”. Everything below that are other ionization models which you may or may not be interested in.
+“TDP (with fixed densities)”. Everything below this line create other ionization models which you may or may not be interested in.
 
 Anyways, running these five lines will create CLOUDY scripts for individual grid points. 
 If your rootdir was set to r, these scripts will be stored under r/PI/TDP_isochoric/u/z=1/log_metals=m/log_hdens=n/T0=xK”, where u, m, n, and x are the considered UVB,
 metallicity, density, and initial temperature. You can switch the redshift to be of your preference depending on the relevant absorption sample. 
 To actually get the model grid, you will need to run scripts for each grid point. For convenience, the code cell also prints executable commands that can conveniently 
 allow you to do so. Switch your command line directory to r/PI/TDP_isochoric, and copy and paste these commands into your terminal. It will take a while to 
-finish (~2 min per script on a Macbook Pro M2 chip), but at the end, you should have output ion fractions (saved with extension “.elem”, 
+finish (~2 min per script using a Macbook Pro M2 chip), but at the end, you should have output ion fractions (saved with extension “.elem”, 
 with elem = carb, nit, oxy, etc.) in the directory for each grid point.
 
 Parsing and interpolating the output files - having obtained ion fractions for each grid point, you can use the notebook 
 "TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to create a pickled version 
-of ion fraction grids across a range of densities and metallicities. 
-Find a sample saved grid used for this paper at https://drive.google.com/drive/folders/1crTCXT0ydxPIBccDyS9nuJMD5E2rbY41?usp=sharing.
+of ion fraction grids across a range of densities and metallicities.
 
 Comparing with observations - see the notebook z=1.26_TDP_fit.ipynb (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/z%3D1.26_TDP_fit.ipynb) 
 for a tutorial on how to compare TDP model grids with Voigt profile measurements. You'll have to ensure that the Python emcee library 

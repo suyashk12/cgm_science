@@ -1,0 +1,1 @@
+your_path_here/cloudy.exe -r $1
