@@ -6,8 +6,12 @@ import matplotlib.pyplot as plt
 import os
 import glob
 from astropy.io import fits
+from pathlib import Path
 
-rootdir = '/Users/thepoetoftwilight/Documents/CUBS/Data/CONTACT/'
+rootdir = '/Users/thepoetoftwilight/Documents/CUBS/Data/CONTACT/STIS/'
+
+# Reference FITS file for saving stuff
+fits_ref = fits.open(rootdir+'PG1522+101_E230M_new.fits')
 
 class spec_1d:
 
@@ -28,7 +32,7 @@ class spec_1d:
             self.es_str = '_es={}'.format(es)
 
 
-    def load_fits(self):
+    def load_spec1d_unstitched(self):
 
         '''
         Function to load 1D FITS files extracted from the MAST 2D products using the stistools routine
@@ -41,13 +45,14 @@ class spec_1d:
         self.fits_list = [fits.open(f) for f in self.file_list]
 
         # Number of exposures
-        self.n_exps = len(self.fits_list)
+        self.n_exps = len(self.exp_names)
         # Number of wavelength orders in each exposure
         self.n_orders = self.fits_list[0][1].data.shape[0]
         # Number of wavelength pixels in each wavelength order
         self.n_pixels = self.fits_list[0][1].data[0][2].shape[0]
 
-    def save_spec_unstitched(self):
+
+    def parse_spec1d_unstitched(self):
 
         '''
         Function to extract fluxes for all wavelength orders across all exposures
@@ -113,202 +118,154 @@ class spec_1d:
                 spec_data_interp[i,j,:,1] = flux_order
                 spec_data_interp[i,j,:,2] = np.sqrt(var_order)
 
-        # Store the renewed data grid
+        # Store the renewed wavelength grid, flattened wavelength array, and interpolated data grid
         self.wav_order_grid = wav_order_grid
+        self.wav_stitch = np.unique(self.wav_order_grid)
         self.spec_data_interp = spec_data_interp
 
-    def stitch_orders_ind_exp(self, SN_thresh=-3, sig_thresh=3):
+    def stitch_spec1d(self, exp_indices, savedir, fname, SN_thresh=-3, sig_thresh=3):
         
         '''
-        Function for stitching 1D orders for individual exposures. The first rejection criterion is points with negative flux,
-        the second is for sigma-clipping.
+        Function to stitch a specified list of exposures and save it. This function 
+        uses helper functions defined outside the present class
         '''
 
-        # Unique wavelengths, for final 1D stitched spectrum
-        wav_stitch = np.unique(self.wav_order_grid)
+        # Create wave dictionary for specified exposures
+        wav_dict = construct_wav_dict(self.wav_stitch, self.spec_data_interp, exp_indices)
 
-        # Save results for each exposure
-        reject_stitch_1_dict = {}
-        reject_stitch_2_dict = {}
-        wav_stitch_dict = {}
-        flux_stitch_dict = {}
-        err_stitch_dict = {}
+        # Stitch across orders, possibly exposures
+        flux_stitch, err_stitch, reject_stitch_1, reject_stitch_2 = stitch_wav_dict(self.wav_stitch, wav_dict, SN_thresh, sig_thresh)
 
-        for i in range(self.n_exps):
+        # Save the spectrum into a FITS file for later exploration
+        save_spec1d_fits(savedir, fname, self.wav_stitch, flux_stitch, err_stitch)
 
-            # For each unique wavelength, record fluxes and errors
-            # Each wavelength has overlapping measurements because of overlapping orders
+def construct_wav_dict(wav_stitch, spec_data_interp, exp_indices):
 
-            wav_dict = {w:[] for w in wav_stitch}
+    '''
+    Function to construct mapping of fluxes and errors to wavelengths
+    for a specified set of exposures
+    '''
 
-            for j in range(self.n_orders):
-                for k in range(self.n_pixels):
-                    
-                    w = self.spec_data_interp[i,j,k,0]
-                    f = self.spec_data_interp[i,j,k,1]
-                    s = self.spec_data_interp[i,j,k,2]
-                    
-                    wav_dict[w].append([f,s])
+    wav_dict = {w:[] for w in wav_stitch}
 
-            # Store co-added fluxes and errors
-            flux_stitch = np.zeros(len(wav_stitch))
-            err_stitch = np.zeros(len(wav_stitch))
-
-            # Also keep track of fraction of rejected measurements from S/N threshold and sigma-clipping 
-            reject_stitch_1 = np.zeros(len(wav_stitch))
-            reject_stitch_2 = np.zeros(len(wav_stitch))
-
-            for l in range(len(wav_stitch)):
+    for i in exp_indices:
+        for j in range(spec_data_interp.shape[1]):
+            for k in range(spec_data_interp.shape[2]):
                 
-                # Get wavelength, and quantities (flux, error) to be combined
-                w = wav_stitch[l]
-                spec_arr = np.array(wav_dict[w])
-                flux_arr = spec_arr[:,0]
-                err_arr = spec_arr[:,1]
+                w = spec_data_interp[i,j,k,0]
+                f = spec_data_interp[i,j,k,1]
+                s = spec_data_interp[i,j,k,2]
                 
-                # Number of measurements, from multiple exposures and overlapping orders
-                obs_count = len(flux_arr)
-                
-                # Reject fluxes that are "too" negative, record fraction of rejections
-                idx_1 = flux_arr/err_arr < SN_thresh
-                reject_stitch_1[l] = np.sum(idx_1)/obs_count
-                
-                # Fluxes and errors after rejecting
-                flux_arr = flux_arr[~idx_1]
-                err_arr = err_arr[~idx_1]
-                
-                # Next, after rejecting these points, perform median filtering
-                mu = np.median(flux_arr)
-                sigma = np.sqrt(np.mean((flux_arr-mu)**2))
+                wav_dict[w].append([f,s])    
 
-                # Reject points, record number of rejections
-                idx_2 = np.abs(flux_arr-mu)>sig_thresh*sigma
-                reject_stitch_2[l] = np.sum(idx_2)/obs_count
-                
-                # Fluxes and errors that are good to go
-                flux_arr = flux_arr[~idx_2]
-                err_arr = err_arr[~idx_2]  
-                
-                # Decide weights for each measurement, inverse varance weighting
-                # This minimizes the variance
-                wts_arr = 1/err_arr**2
-                # Ensure weights are normalized to one
-                wts_arr /= np.sum(wts_arr)
-                
-                # Record the co-added fluxes and errors
-                flux_stitch[l] = np.sum(wts_arr*flux_arr)
-                # Apply square of weights to variance, then add, then 
-                err_stitch[l] = np.sqrt(np.sum(wts_arr**2*err_arr**2))
 
-                # Save the spectrum and rejection parameters
-                reject_stitch_1_dict[self.exp_names[i]] = reject_stitch_1
-                reject_stitch_2_dict[self.exp_names[i]] = reject_stitch_2
-                wav_stitch_dict[self.exp_names[i]] = wav_stitch
-                flux_stitch_dict[self.exp_names[i]] = flux_stitch
-                err_stitch_dict[self.exp_names[i]] = err_stitch
+    return wav_dict
 
-        self.reject_stitch_1_dict = reject_stitch_1_dict
-        self.reject_stitch_2_dict = reject_stitch_2_dict
-        self.wav_stitch_dict = wav_stitch_dict
-        self.flux_stitch_dict = flux_stitch_dict
-        self.err_stitch_dict = err_stitch_dict
+def stitch_wav_dict(wav_stitch, wav_dict, SN_thresh=-3, sig_thresh=3):
 
-    def save_spec_stitched_ind_exp(self):
+    '''
+    Function to stitch dictionary of fluxes and errors using inverse variance weighting.
+    Very negative fluxes are rejected, followed by rejection following median clipping
+    '''
 
-        '''
-        Function to save stitched spectra for individual exposures
-        '''
+    # Store co-added fluxes and errors
+    flux_stitch = np.zeros(len(wav_stitch))
+    err_stitch = np.zeros(len(wav_stitch))
 
-        for exp_name in self.exp_names:
-            spec_final_grid = np.array([self.wav_stitch_dict[exp_name], self.flux_stitch_dict[exp_name], self.err_stitch_dict[exp_name]]).T
-            np.savetxt(rootdir+'{}/{}_{}_x1d{}.dat'.format(self.qso_name, self.qso_name, exp_name, self.es_str), spec_final_grid)
+    # Also keep track of fraction of rejected measurements from S/N threshold and sigma-clipping 
+    reject_stitch_1 = np.zeros(len(wav_stitch))
+    reject_stitch_2 = np.zeros(len(wav_stitch))
 
-    def stitch_orders_add_exp(self, SN_thresh=-3, sig_thresh=3):
+    for i in range(len(wav_stitch)):
+        
+        # Get wavelength, and quantities (flux, error) to be combined
+        w = wav_stitch[i]
+        spec_arr = np.array(wav_dict[w])
+        flux_arr = spec_arr[:,0]
+        err_arr = spec_arr[:,1]
+        
+        # Number of measurements, from multiple exposures and overlapping orders
+        obs_count = len(flux_arr)
+        
+        # Reject fluxes that are "too" negative, record fraction of rejections
+        idx_1 = flux_arr/err_arr < SN_thresh
+        reject_stitch_1[i] = np.sum(idx_1)/obs_count
+        
+        # Fluxes and errors after rejecting
+        flux_arr = flux_arr[~idx_1]
+        err_arr = err_arr[~idx_1]
+        
+        # Next, after rejecting these points, perform median filtering
+        mu = np.median(flux_arr)
+        sigma = np.sqrt(np.mean((flux_arr-mu)**2))
 
-        '''
-        Function for stitching 1D orders across all exposures. The first rejection criterion is points with negative flux,
-        the second is for sigma-clipping.
-        '''
+        # Reject points, record number of rejections
+        idx_2 = np.abs(flux_arr-mu)>sig_thresh*sigma
+        reject_stitch_2[i] = np.sum(idx_2)/obs_count
+        
+        # Fluxes and errors that are good to go
+        flux_arr = flux_arr[~idx_2]
+        err_arr = err_arr[~idx_2]  
+        
+        # Decide weights for each measurement, inverse varance weighting
+        # This minimizes the variance
+        wts_arr = 1/err_arr**2
+        # Ensure weights are normalized to one
+        wts_arr /= np.sum(wts_arr)
+        
+        # Record the co-added fluxes and errors
+        flux_stitch[i] = np.sum(wts_arr*flux_arr)
+        # Apply square of weights to variance, then add, then 
+        err_stitch[i] = np.sqrt(np.sum(wts_arr**2*err_arr**2))
 
-        # Unique wavelengths, for final 1D stitched spectrum
-        wav_stitch = np.unique(self.wav_order_grid)
+    return flux_stitch, err_stitch, reject_stitch_1, reject_stitch_2
 
-        # For each unique wavelength, record fluxes and errors
-        # Each wavelength has overlapping measurements because of multiple exposures, and also overlapping orders
+def save_spec1d_fits(savedir, fname, wav, flux, err):
 
-        wav_dict = {w:[] for w in wav_stitch}
+    '''
+    Function to save FITS for 1D spectrum in a format friendly with plotabs
+    to help future absorption line search
+    '''
 
-        for i in range(self.n_exps):
-            for j in range(self.n_orders):
-                for k in range(self.n_pixels):
-                    
-                    w = self.spec_data_interp[i,j,k,0]
-                    f = self.spec_data_interp[i,j,k,1]
-                    s = self.spec_data_interp[i,j,k,2]
-                    
-                    wav_dict[w].append([f,s])
+    # Load in a reference FITS file for header
 
-        # Store co-added fluxes and errors
-        flux_stitch = np.zeros(len(wav_stitch))
-        err_stitch = np.zeros(len(wav_stitch))
+    # Define data columns
+    c1 = fits.Column(name='wave    ', array=wav, format='D')
+    c2 = fits.Column(name='flux    ', array=flux, format='D')
+    c3 = fits.Column(name='error   ', array=err, format='D')
+    c4 = fits.Column(name='error_u ', array=err, format='D')
+    c5 = fits.Column(name='error_d ', array=err, format='D')
+    c6 = fits.Column(name='counts_total', array=np.zeros(len(wav)), format='D')
+    c7 = fits.Column(name='counts_net', array=np.zeros(len(wav)), format='D')
+    c8 = fits.Column(name='npix    ', array=np.zeros(len(wav)), format='D')
+    c9 = fits.Column(name='exptime ', array=np.zeros(len(wav)), format='D')
+    c10 = fits.Column(name='mask    ', array=np.ones(len(wav)), format='K')
+    c11 = fits.Column(name='continuum', array=np.ones(len(wav)), format='D')
 
-        # Also keep track of fraction of rejected measurements from S/N threshold and sigma-clipping 
-        reject_stitch_1 = np.zeros(len(wav_stitch))
-        reject_stitch_2 = np.zeros(len(wav_stitch))
+    # Make HDU table
+    table_hdu = fits.BinTableHDU.from_columns([c1, c2, c3, 
+                                               c4, c5, c6, 
+                                               c7, c8, c9, 
+                                               c10, c11])
+    
+    # Make HDU
+    hdu = fits.HDUList([fits_ref[0], table_hdu])  
 
-        for i in range(len(wav_stitch)):
-            
-            # Get wavelength, and quantities (flux, error) to be combined
-            w = wav_stitch[i]
-            spec_arr = np.array(wav_dict[w])
-            flux_arr = spec_arr[:,0]
-            err_arr = spec_arr[:,1]
-            
-            # Number of measurements, from multiple exposures and overlapping orders
-            obs_count = len(flux_arr)
-            
-            # Reject fluxes that are "too" negative, record fraction of rejections
-            idx_1 = flux_arr/err_arr < SN_thresh
-            reject_stitch_1[i] = np.sum(idx_1)/obs_count
-            
-            # Fluxes and errors after rejecting
-            flux_arr = flux_arr[~idx_1]
-            err_arr = err_arr[~idx_1]
-            
-            # Next, after rejecting these points, perform median filtering
-            mu = np.median(flux_arr)
-            sigma = np.sqrt(np.mean((flux_arr-mu)**2))
 
-            # Reject points, record number of rejections
-            idx_2 = np.abs(flux_arr-mu)>sig_thresh*sigma
-            reject_stitch_2[i] = np.sum(idx_2)/obs_count
-            
-            # Fluxes and errors that are good to go
-            flux_arr = flux_arr[~idx_2]
-            err_arr = err_arr[~idx_2]  
-            
-            # Decide weights for each measurement, inverse varance weighting
-            # This minimizes the variance
-            wts_arr = 1/err_arr**2
-            # Ensure weights are normalized to one
-            wts_arr /= np.sum(wts_arr)
-            
-            # Record the co-added fluxes and errors
-            flux_stitch[i] = np.sum(wts_arr*flux_arr)
-            # Apply square of weights to variance, then add, then 
-            err_stitch[i] = np.sqrt(np.sum(wts_arr**2*err_arr**2))
+    # Check if path exists, otherwise make it
+    Path(savedir).mkdir(parents=True, exist_ok=True)
+    # Write HDU
+    hdu.writeto(savedir + '{}.fits'.format(fname), overwrite=True)
 
-            # Save the spectrum and rejection parameters
-            self.reject_stitch_1 = reject_stitch_1
-            self.reject_stitch_2 = reject_stitch_2
-            self.wav_stitch = wav_stitch
-            self.flux_stitch = flux_stitch
-            self.err_stitch = err_stitch
+def load_spec1d_fits(loaddir, fname):
 
-    def save_spec_stitched_add_exp(self):
+    '''
+    Function to load saved spectrum. FITS file assumed to be stored in a plotabs friendly format.
+    '''
 
-        '''
-        Function to save stitched spectrum
-        '''
-        spec_final_grid = np.array([self.wav_stitch, self.flux_stitch, self.err_stitch]).T
-        np.savetxt(rootdir+'{}/{}_x1d{}.dat'.format(self.qso_name, self.qso_name, self.es_str), spec_final_grid)
+    f = fits.open(loaddir+fname+'.fits')
+    wav = np.array(f[1].data['wave'])
+    flux = np.array(f[1].data['flux'])
+    err = np.array(f[1].data['error'])
+
+    return wav, flux, err

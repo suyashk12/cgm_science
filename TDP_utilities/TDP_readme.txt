@@ -1,4 +1,7 @@
 
+This is a tutorial for creating time-dependent photoionization scripts for a range of gas densities and metallicities using CLOUDY.
+If you run into errors or have any questions, please reach out to me at suyashk@uchicago.edu!
+
 ---------------------
 | Installing CLOUDY |
 ---------------------
@@ -43,14 +46,16 @@ Building a model grid - After confirming that you can run the sample TDP script,
 and metallicities. Then, run the Jupyter Notebook "non_eqm_scripts.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_scripts_write.ipynb). 
 Make sure rootdir is set to the directory where you’d like to build your model grid. You can specify the list of metallicities and densities 
 for which you’d like to run TDP models. You can also specify the UVB(s) and initial temperature(s) for which you’d like to run the script. 
-You need only concern yourself with the “TDP (with fixed densities)” code cell, which will create CLOUDY scripts for individual grid points. 
+If running TDP models is all you are concerned with, you need only run the first five code cells - i.e. till the cell below
+“TDP (with fixed densities)”. Everything below that are other ionization models which you may or may not be interested in.
+
+Anyways, running these five lines will create CLOUDY scripts for individual grid points. 
 If your rootdir was set to r, these scripts will be stored under r/PI/TDP_isochoric/u/z=1/log_metals=m/log_hdens=n/T0=xK”, where u, m, n, and x are the considered UVB,
 metallicity, density, and initial temperature. You can switch the redshift to be of your preference depending on the relevant absorption sample. 
 To actually get the model grid, you will need to run scripts for each grid point. For convenience, the code cell also prints executable commands that can conveniently 
 allow you to do so. Switch your command line directory to r/PI/TDP_isochoric, and copy and paste these commands into your terminal. It will take a while to 
 finish (~2 min per script on a Macbook Pro M2 chip), but at the end, you should have output ion fractions (saved with extension “.elem”, 
 with elem = carb, nit, oxy, etc.) in the directory for each grid point.
-
 
 Parsing and interpolating the output files - having obtained ion fractions for each grid point, you can use the notebook 
 "TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to create a pickled version 
