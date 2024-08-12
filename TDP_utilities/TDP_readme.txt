@@ -48,7 +48,7 @@ To use the FG20 UVB in photoionization calculations, see https://galaxies.northw
 ---------------------------------------------
 
 Building a model grid - After confirming that you can run the sample TDP script, choose a directory where you’d like to build your model grid for a range of densities 
-and metallicities. Then, run the Jupyter Notebook "non_eqm_scripts.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_scripts_write.ipynb). 
+and metallicities. Then, run the Jupyter Notebook "TDP_scripts_write.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_scripts_write.ipynb). 
 Make sure rootdir is set to the directory where you’d like to build your model grid and 
 set cloudy_path to where cloudy.exe is saved in your computer (see sections above). Within the Jupyter notebook,
 you can specify the list of metallicities and densities for which you’d like to run TDP models. 
@@ -65,9 +65,13 @@ finish (~2 min per script using a Macbook Pro M2 chip), but at the end, you shou
 with elem = carb, nit, oxy, etc.) in the directory for each grid point.
 
 Parsing and interpolating the output files - having obtained ion fractions for each grid point, you can use the notebook 
-"TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to create a pickled version 
-of ion fraction grids across a range of densities and metallicities.
+"TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to parse the output of CLOUDY scripts
+run for individual grid points. Make sure to set rootdir to the location where ".elem" files from the previous step were saved, and that the specified
+grids for density and metallicity are consistent with that specified in "TDP_scripts_write.ipynb" (you cannot parse what you did not create!).
+I store the ion fraction grid as a "pickle" file (https://docs.python.org/3/library/pickle.html). This way, when comparing TDP models to measurements (see next step),
+the grid of ion fractions can be loaded as a dictionary "d", where fractions for an ionic species "X" can be accessed using d[X].
 
 Comparing with observations - see the notebook z=1.26_TDP_fit.ipynb (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/z%3D1.26_TDP_fit.ipynb) 
 for a tutorial on how to compare TDP model grids with Voigt profile measurements. You'll have to ensure that the Python emcee library 
-is installed (https://emcee.readthedocs.io/en/stable/user/install/).
+is installed (https://emcee.readthedocs.io/en/stable/user/install/) and that the specified grid points for density and metallicity are consistent with
+"TDP_scripts_write.ipynb" (again, you cannot parse what you did not create!)
