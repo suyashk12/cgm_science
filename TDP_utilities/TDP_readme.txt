@@ -81,8 +81,8 @@ To use the FG20 UVB in photoionization calculations, see https://galaxies.northw
 After confirming that you can run the sample TDP script, choose a directory where you’d like to build your model grid for a range of densities 
 and metallicities. Then, run the Jupyter Notebook "TDP_scripts_write.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_scripts_write.ipynb). 
 Make sure rootdir is set to the directory where you’d like to build your model grid and 
-set cloudy_path to where cloudy.exe is saved in your computer (see sections above). Within the Jupyter notebook,
-you can specify the list of metallicities and densities for which you’d like to run TDP models. 
+set cloudy_path to where cloudy.exe is saved in your computer (see sections above, note again that this is a directory, do not add cloudy.exe at the end!) 
+Within the Jupyter notebook, you can specify the list of metallicities and densities for which you’d like to run TDP models. 
 You can also specify the UVB(s) and initial temperature(s) for which you’d like to run the script. 
 If running TDP models is all you are concerned with, you need only run the first five code cells - i.e. till the cell below
 “TDP (with fixed densities)”. Everything below this line create other ionization models which you may or may not be interested in.

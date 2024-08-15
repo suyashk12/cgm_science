@@ -1501,7 +1501,7 @@ def plot_logN_ratio_track(ax, ion1, ion2, ion3, ion4, logX_dict_TDP_interp,
                        logT_plot_min, logT_plot_max, dlogT_plot,
                        logT_mark_min, logT_mark_max, dlogT_mark,
                        xmin, xmax, ymin, ymax,
-                       ls, horz_al='right', vert_al='top'):
+                       ls, horz_al='left', vert_al='top'):
     
 
     '''
@@ -1546,30 +1546,58 @@ def plot_logN_ratio_track(ax, ion1, ion2, ion3, ion4, logX_dict_TDP_interp,
     # -5 is a numerical tolerance I found by plotting the ion fractions
     idx = ((x1>-5)&(x2>-5)&(y1>-5)&(y2>-5))
     
+    # Get elements
+    if ion1=='HI':
+        ex1 = 'H'
+    else: 
+        ex1 = ion_species_dict[ion1].split('+')[0]
+    
+    if ion2=='HI':
+        ex2 = 'H'
+    else:
+        ex2 = ion_species_dict[ion2].split('+')[0]
+
+    if ion3 == 'HI':
+        ey1 = 'H'
+    else:
+        ey1 = ion_species_dict[ion3].split('+')[0]
+
+    if ion4 == 'HI':
+        ey2 = 'H'
+    else:
+        ey2 = ion_species_dict[ion4].split('+')[0]
+
     # Plot the track, label its density
-    ax.plot(x2[idx]-x1[idx], 
-            y2[idx]-y1[idx], color='black', linestyle=ls,
+    #print(ey1, ey2, np.log10(solar_rel_dens_dict[ey2]/solar_rel_dens_dict[ey1]))
+
+    dx21 = x2[idx]-x1[idx]+np.log10(solar_rel_dens_dict[ex2]/solar_rel_dens_dict[ex1])
+    dy21 = y2[idx]-y1[idx]+np.log10(solar_rel_dens_dict[ey2]/solar_rel_dens_dict[ey1])
+
+    ax.plot(dx21, 
+            dy21, color='black', linestyle=ls,
             label=r'$\log (n_\mathrm{{H}}/\mathrm{{cm}}^{{-3}}) = {0:.1f}$'.format(log_hdens_plot))
     
     # Label track with temperature
     for logT in np.arange(logT_mark_min,logT_mark_max,dlogT_mark):
-
+        
         # Access specific grid point
         k0 = (log_metals_plot,log_hdens_plot,logT)
 
         x10 = logX_dict_TDP_interp[ion1](k0)
         x20 = logX_dict_TDP_interp[ion2](k0)
+        dx210 = (x20-x10)+np.log10(solar_rel_dens_dict[ex2]/solar_rel_dens_dict[ex1])
 
         y10 = logX_dict_TDP_interp[ion3](k0)
         y20 = logX_dict_TDP_interp[ion4](k0)
+        dy210 = (y20-y10)+np.log10(solar_rel_dens_dict[ey2]/solar_rel_dens_dict[ey1])
         
         s = str(np.round(logT,1))
         
         # Check if all ion fractions are valid and within bounds for the plot
-        if x10>-5 and x20>-5 and y10>-5 and y20>-5 and xmin<x20-x10<xmax and ymin<y20-y10<ymax:
+        if x10>-5 and x20>-5 and y10>-5 and y20>-5 and xmin<dx210<xmax and ymin<dy210<ymax:
     
-            ax.scatter(x20-x10, y20-y10, color='black', facecolor='none')
-            ax.text(x20-x10, y20-y10, s, fontsize=10, horizontalalignment=horz_al, verticalalignment=vert_al)
+            ax.scatter(dx210, dy210, color='black', facecolor='none')
+            ax.text(dx210, dy210, s, fontsize=10, horizontalalignment=horz_al, verticalalignment=vert_al)
 
     # Set plot bounds
     ax.set_xlim(xmin,xmax)
