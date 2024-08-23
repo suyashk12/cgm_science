@@ -283,7 +283,9 @@ def counts_coadd(wav_stitch, wav_dict):
 
     # Store co-added gross and net count rates
     gross_cts_stitch = np.zeros(len(wav_stitch))
-    bg_cts_stitch = np.zeros(len(wav_stitch))
+    net_cts_stitch = np.zeros(len(wav_stitch))
+    err_u_cts_stitch = np.zeros(len(wav_stitch))
+    err_d_cts_stitch = np.zeros(len(wav_stitch))
     err_cts_stitch = np.zeros(len(wav_stitch))
     exp_time_stitch = np.zeros(len(wav_stitch))
 
@@ -323,20 +325,23 @@ def counts_coadd(wav_stitch, wav_dict):
             # Obtain errors using gross counts
             err_lo = gross_counts-lam_l_interp(gross_counts)
             err_hi = lam_u_interp(gross_counts)-gross_counts
-            err = .5*(err_lo + err_hi) # Take the average    
 
             gross_cts_stitch[i] = gross_counts
-            bg_cts_stitch[i] = np.sum(bg_arr)
-            err_cts_stitch[i] = err
+            net_cts_stitch[i] = gross_counts-np.sum(bg_arr)
+            err_u_cts_stitch[i] = err_hi
+            err_d_cts_stitch[i] = err_lo
+            err_cts_stitch[i] = .5*(err_lo + err_hi) # Take the average 
             exp_time_stitch[i] = np.sum(et_arr)
-       
+
     # Convert counts to count rates to flux calibrate
-    net_ct_rates_stitch = (gross_cts_stitch-bg_cts_stitch)/exp_time_stitch
+    net_ct_rates_stitch = net_cts_stitch/exp_time_stitch
+    err_u_ct_rates_stitch = err_u_cts_stitch/exp_time_stitch
+    err_d_ct_rates_stitch = err_d_cts_stitch/exp_time_stitch
     err_ct_rates_stitch = err_cts_stitch/exp_time_stitch
 
-    return net_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict
+    return gross_cts_stitch, net_cts_stitch, exp_time_stitch, net_ct_rates_stitch, err_u_ct_rates_stitch, err_d_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict
 
-def flux_calibrate(wav_stitch, net_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict):
+def flux_calibrate(wav_stitch, net_ct_rates_stitch, err_u_ct_rates_stitch, err_d_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict):
 
     '''
     Function to flux calibrate 1D spectrum from count rates to flux
@@ -368,9 +373,11 @@ def flux_calibrate(wav_stitch, net_ct_rates_stitch, err_ct_rates_stitch, net_ct_
      
     # Flux calibrated
     flux_stitch = net_ct_rates_stitch*sens_med
+    err_u_stitch = err_u_ct_rates_stitch*sens_med
+    err_d_stitch = err_d_ct_rates_stitch*sens_med
     err_stitch = err_ct_rates_stitch*sens_med
     
-    return wav_stitch, flux_stitch, err_stitch
+    return wav_stitch, flux_stitch, err_u_stitch, err_d_stitch, err_stitch
 
 def coadd_1dspec(qso_name, exp_names, es=4):
 
@@ -395,34 +402,47 @@ def coadd_1dspec(qso_name, exp_names, es=4):
     wav_dict = wav_map_construct(wav_stitch, spec_data_interp)
 
     # Co-add counts
-    net_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict = counts_coadd(wav_stitch, wav_dict)
+    gross_cts_stitch, net_cts_stitch, exp_time_stitch, net_ct_rates_stitch, err_u_ct_rates_stitch, err_d_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict = counts_coadd(wav_stitch, 
+                                                                                                                                                                                wav_dict)
 
     # Flux calibrate
-    wav_stitch, flux_stitch, err_stitch = flux_calibrate(wav_stitch, net_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict)
+    wav_stitch, flux_stitch, err_u_stitch, err_d_stitch, err_stitch = flux_calibrate(wav_stitch, net_ct_rates_stitch, err_u_ct_rates_stitch, 
+                                                                                     err_d_ct_rates_stitch, err_ct_rates_stitch, net_ct_rate_dict, flux_dict)
 
-    return wav_stitch, flux_stitch, err_stitch
 
-def save_spec1d_fits(savedir, fname, wav, flux, err):
+    # Pack into a dictionary
+    d = {'wave': wav_stitch,
+         'flux': flux_stitch,
+         'error': err_stitch,
+         'error_u': err_u_stitch,
+         'error_d': err_d_stitch,
+         'counts_total': gross_cts_stitch,
+         'counts_net': net_cts_stitch,
+         'exptime': exp_time_stitch}
+
+    return d
+
+def save_spec1d_fits(savedir, fname, d):
 
     '''
     Function to save FITS for 1D spectrum in a format friendly with plotabs
-    to help future absorption line search
+    to help future absorption line search. Input should be packed into a dict.
     '''
 
     # Load in a reference FITS file for header
 
     # Define data columns
-    c1 = fits.Column(name='wave    ', array=wav, format='D')
-    c2 = fits.Column(name='flux    ', array=flux, format='D')
-    c3 = fits.Column(name='error   ', array=err, format='D')
-    c4 = fits.Column(name='error_u ', array=err, format='D')
-    c5 = fits.Column(name='error_d ', array=err, format='D')
-    c6 = fits.Column(name='counts_total', array=np.zeros(len(wav)), format='D')
-    c7 = fits.Column(name='counts_net', array=np.zeros(len(wav)), format='D')
-    c8 = fits.Column(name='npix    ', array=np.zeros(len(wav)), format='D')
-    c9 = fits.Column(name='exptime ', array=np.zeros(len(wav)), format='D')
-    c10 = fits.Column(name='mask    ', array=np.ones(len(wav)), format='K')
-    c11 = fits.Column(name='continuum', array=np.ones(len(wav)), format='D')
+    c1 = fits.Column(name='wave    ', array=d['wave'], format='D')
+    c2 = fits.Column(name='flux    ', array=d['flux'], format='D')
+    c3 = fits.Column(name='error   ', array=d['error'], format='D')
+    c4 = fits.Column(name='error_u ', array=d['error_u'], format='D')
+    c5 = fits.Column(name='error_d ', array=d['error_d'], format='D')
+    c6 = fits.Column(name='counts_total', array=d['counts_total'], format='D')
+    c7 = fits.Column(name='counts_net', array=d['counts_net'], format='D')
+    c8 = fits.Column(name='npix    ', array=np.zeros(len(d['wave'])), format='D')
+    c9 = fits.Column(name='exptime ', array=d['exptime'], format='D')
+    c10 = fits.Column(name='mask    ', array=np.ones(len(d['wave'])), format='K')
+    c11 = fits.Column(name='continuum', array=np.ones(len(d['wave'])), format='D')
 
     # Make HDU table
     table_hdu = fits.BinTableHDU.from_columns([c1, c2, c3, 

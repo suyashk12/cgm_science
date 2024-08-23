@@ -33,15 +33,18 @@ cdf_3sig = 0.9987
 # Similarly, assume HeI to be present already too
 IP_dict = {'HI': -1.,
             'HeI': 0., 
+            'MgI': 0.1, 
             'AlII': 5.986,
             'MgII': 7.646,
             'FeII': 7.87,
             'SiII': 8.151,
+            'SII': 10.36,
             'CII': 11.26,
             'OII': 13.618,
             'NII': 14.534,
             'SiIII': 16.345,
             'AlIII': 18.826,
+            'SIII': 23.33,
             'CIII': 24.383,
             'NIII': 29.601,
             'SiIV': 33.492,
@@ -63,15 +66,18 @@ IP_dict = {'HI': -1.,
 # This is to convert ions from VP fit into species for the CLOUDY interpolated grid
 ion_species_dict  = {'HI': '#column density H',
                      'HeI': 'He',
-                     'AlII': 'Al+',
+                    'MgI': 'Mg',
+                    'AlII': 'Al+',
                     'MgII': 'Mg+',
                     'FeII': 'Fe+',
                     'SiII': 'Si+',
+                    'SII': 'S+',
                     'CII': 'C+',
                     'OII': 'O+',
                     'NII': 'N+',
                     'SiIII': 'Si+2',
                     'AlIII': 'Al+2',
+                    'SIII': 'S+2',
                     'CIII': 'C+2',
                     'NIII': 'N+2',
                     'SiIV': 'Si+3',
@@ -1501,7 +1507,8 @@ def plot_logN_ratio_track(ax, ion1, ion2, ion3, ion4, logX_dict_TDP_interp,
                        logT_plot_min, logT_plot_max, dlogT_plot,
                        logT_mark_min, logT_mark_max, dlogT_mark,
                        xmin, xmax, ymin, ymax,
-                       ls, horz_al='left', vert_al='top'):
+                       ls, horz_al='left', vert_al='top', 
+                       logT_special=None):
     
 
     '''
@@ -1596,8 +1603,12 @@ def plot_logN_ratio_track(ax, ion1, ion2, ion3, ion4, logX_dict_TDP_interp,
         # Check if all ion fractions are valid and within bounds for the plot
         if x10>-5 and x20>-5 and y10>-5 and y20>-5 and xmin<dx210<xmax and ymin<dy210<ymax:
     
-            ax.scatter(dx210, dy210, color='black', facecolor='none')
-            ax.text(dx210, dy210, s, fontsize=10, horizontalalignment=horz_al, verticalalignment=vert_al)
+            if logT == logT_special:
+                c = 'red'
+            else:
+                c = 'black'
+            ax.scatter(dx210, dy210, color=c, facecolor='none')
+            ax.text(dx210, dy210, s, fontsize=10, color=c, horizontalalignment=horz_al, verticalalignment=vert_al)
 
     # Set plot bounds
     ax.set_xlim(xmin,xmax)
