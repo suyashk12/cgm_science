@@ -3,7 +3,7 @@ import pandas as pd
 from astropy.io import fits
 import matplotlib.pyplot as plt
 
-plt.style.use('/Users/thepoetoftwilight/Documents/CUBS/Code/science.mplstyle')
+plt.style.use('/Users/thepoetoftwilight/Documents/Astro/Code/PG1522+101/science.mplstyle')
 
 gal_lines = np.loadtxt('redshiftLines.dat', skiprows=1, dtype=str)
 
@@ -54,7 +54,7 @@ def load_ldss_spec_1d(loaddir, mask_num, slit_num):
     return wav, flux, err
 
 
-def load_eigenspec(loaddir='/Users/thepoetoftwilight/Documents/CUBS/Data/Eigenspectra/eigen_galaxy_Bolton2012.csv'):
+def load_eigenspec(loaddir='/Users/thepoetoftwilight/Documents/Astro/Data/Eigenspectra/eigen_galaxy_Bolton2012.csv'):
 
     'Function to read SDSS based Eigenspectra to be used for redshift fitting'
 

@@ -18,7 +18,7 @@ from scipy import integrate
 from scipy import interpolate
 
 # Use Zhijie's plotting style
-plt.style.use('/Users/thepoetoftwilight/Documents/CUBS/Code/science.mplstyle')
+plt.style.use('/Users/thepoetoftwilight/Documents/Astro/Code/PG1522+101/science.mplstyle')
 
 # List of atmoic numbers
 A_dict = {'H' : 1.00797 ,
@@ -82,7 +82,7 @@ amu = 1.66054e-27
 sigma_0 = 2.654E-2
 
 # Table of transitions
-atomic_data_table = np.loadtxt('/Users/thepoetoftwilight/Documents/CUBS/pabs0/data/linelists/atom.dat', dtype=str)
+atomic_data_table = np.loadtxt('/Users/thepoetoftwilight/Documents/Astro/pabs0/data/linelists/atom.dat', dtype=str)
 
 # Assuming that we won't run into more than four components
 colors = ['indigo', 'forestgreen', 'darkgoldenrod', 'dodgerblue', 'darkmagenta', 'olive']    
