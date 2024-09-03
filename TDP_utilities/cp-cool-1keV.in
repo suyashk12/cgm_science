@@ -1,0 +1,16 @@
+coronal 11.654e6 K init time
+hden 0.1 linear
+constant gas pressure reset
+set dr 0
+set nend 1
+stop zone 1
+iterate 300
+stop time when temperature falls below 1e4 K
+cosmic rays background
+#
+# commands controlling output =========
+set cumulative mass
+set trimming off
+set save prefix "cp-cool-1keV"
+save time dependent ".tim" no hash
+save continuum units Angstroms ".concum" cumulative
