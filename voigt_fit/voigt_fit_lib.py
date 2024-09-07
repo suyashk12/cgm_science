@@ -195,6 +195,7 @@ class ion_transition:
 
         # Slice velocities within given bounds
         slice_idx = (v>v_range[0])&(v<v_range[1])
+
         wav_obs = wav[slice_idx]
         v_obs = v[slice_idx]
 
@@ -498,7 +499,7 @@ class ion_transition:
         model_flux_conv = comp_model_spec_gen(v_mod, np.array([[logN_ref, b, 0]]), 
                                         self.wav0_rest, self.f, self.gamma, self.A,
                                         True,
-                                        self.lsf, self.v_lsf)[1]
+                                        self.lsf, self.v_lsf)
         
         # Convert it back to optical depth
         model_tau_conv = -np.log(model_flux_conv)
@@ -533,7 +534,7 @@ class ion_transition:
             model_grid[i,:] = comp_model_spec_gen(self.v, np.array([[logN_grid[i], b, v_c]]), 
                                 self.wav0_rest, self.f, self.gamma, self.A,
                                 True,
-                                self.lsf, self.v_lsf)[1]
+                                self.lsf, self.v_lsf)
             
 
         # Evaluate chi-sq
@@ -586,7 +587,7 @@ class ion_transition:
             model_grid[i,:] = comp_model_spec_gen(self.v, np.array([[logN_grid[i], b, 0]]), 
                                 self.wav0_rest, self.f, self.gamma, self.A,
                                 True,
-                                self.lsf, self.v_lsf)[1]
+                                self.lsf, self.v_lsf)
             
         
         # Create noisy spectra
@@ -660,7 +661,7 @@ class ion_transition:
         n_components = len(init_values)
 
         # Generate fluxes for each component
-        init_comp_fluxes, init_total_flux = comp_model_spec_gen(self.v, init_values, 
+        init_total_flux = comp_model_spec_gen(self.v, init_values, 
                                                             self.wav0_rest, self.f, self.gamma, self.A,
                                                             lsf_convolve, self.lsf, self.v_lsf)
 
@@ -668,7 +669,6 @@ class ion_transition:
         self.n_components = n_components
         self.init_values = init_values
         self.lsf_convolve = lsf_convolve
-        self.init_comp_fluxes = init_comp_fluxes
         self.init_total_flux = init_total_flux
 
     def plot_ion_transition_init_fit(self, fig=None, ax=None, draw_masks=True, legend=True, label_axes=True, colors=colors, linestyles=['-','-','-','-'], lw=0.5,
@@ -710,8 +710,12 @@ class ion_transition:
                 # If constraining b-value directly
             
                 if len(self.init_values[i]) == 3:
+                    
+                    init_comp_flux = comp_model_spec_gen(self.v, [self.init_values[i]], 
+                                                            self.wav0_rest, self.f, self.gamma, self.A,
+                                                            self.lsf_convolve, self.lsf, self.v_lsf)
 
-                    ax.plot(self.v, self.init_comp_fluxes[i], 
+                    ax.plot(self.v, init_comp_flux, 
                             label='log$N$ = ' + str(np.round(self.init_values[i][0], 2)) + '\n' +
                             '$b$ = ' + str(np.round(self.init_values[i][1], 2)) + ' km/s' + '\n' +
                             'd$v_c$ = ' + str(np.round(self.init_values[i][2], 2)) + ' km/s',
@@ -725,7 +729,11 @@ class ion_transition:
 
                 elif len(self.init_values[i]) == 4:
 
-                    ax.plot(self.v, self.init_comp_fluxes[i], 
+                    init_comp_flux = comp_model_spec_gen(v, [self.init_values[i]], 
+                                                            self.wav0_rest, self.f, self.gamma, self.A,
+                                                            self.lsf_convolve, self.lsf, self.v_lsf)
+
+                    ax.plot(self.v, init_comp_flux, 
                             label='log$N$ = ' + str(np.round(self.init_values[i][0], 2)) + '\n' +
                             'log$T$ = ' + str(np.round(self.init_values[i][1], 2)) + '\n' +
                             '$b_{NT}$ = ' + str(np.round(self.init_values[i][2], 2)) + ' km/s' + '\n'
@@ -884,12 +892,11 @@ class ion_transition:
             self.best_errs.append(best_errs_comp)
             
         # Generate fluxes for each component
-        best_comp_fluxes, best_total_flux = comp_model_spec_gen(self.v, self.best_values, 
-                                                            self.wav0_rest, self.f, self.gamma, self.A,
-                                                            self.lsf_convolve, self.lsf, self.v_lsf)
+        best_total_flux = comp_model_spec_gen(self.v, self.best_values, 
+                                            self.wav0_rest, self.f, self.gamma, self.A,
+                                            self.lsf_convolve, self.lsf, self.v_lsf)
 
         # Set all these properties for the ion object
-        self.best_comp_fluxes = best_comp_fluxes
         self.best_total_flux = best_total_flux
 
     def plot_ion_transition_best_fit(self, fig = None, ax = None, draw_masks = True, draw_cont_bounds = True, label_axes=True, legend=True):
@@ -942,14 +949,17 @@ class ion_transition:
                 else:
                     dv_c_err_str = '±' + str(np.round(self.best_errs[i][2], 2))
 
-                ax.plot(self.v, self.best_comp_fluxes[i], 
+                best_comp_flux = comp_model_spec_gen(self.v, [self.best_values[i]], 
+                                                        self.wav0_rest, self.f, self.gamma, self.A,
+                                                        self.lsf_convolve, self.lsf, self.v_lsf)
+
+                ax.plot(self.v, best_comp_flux, 
                         label='log$N$ = ' + logN_str + logN_err_str + '\n' +
                         '$b$ = ' + b_str + b_err_str + ' km/s' + '\n' +
                         'd$v_c$ = ' + dv_c_str + dv_c_err_str + ' km/s',
                         lw=1, color=colors[i])
 
-                ax.vlines(x=self.init_values[i][2], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
-                #ax.axvline(self.best_values[i][2], color=colors[i], linestyle=':')
+                ax.vlines(x=self.best_values[i][2], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
 
             # If constraining logT and b_NT
             if len(self.best_values[i]) == 4:
@@ -979,15 +989,18 @@ class ion_transition:
                 else:
                     dv_c_err_str = '±' + str(np.round(self.best_errs[i][3], 2))
 
-                ax.plot(self.v, self.best_comp_fluxes[i], 
+                best_comp_flux = comp_model_spec_gen(self.v, [self.best_values[i]], 
+                                                        self.wav0_rest, self.f, self.gamma, self.A,
+                                                        self.lsf_convolve, self.lsf, self.v_lsf)
+
+                ax.plot(self.v, best_comp_flux, 
                         label='log$N$ = ' + logN_str + logN_err_str + '\n' +
                         'log$T$ = ' + logT_str + logT_err_str + '\n' +
                         '$b_{NT}$ = ' + b_NT_str + b_NT_err_str + ' km/s' + '\n' +
                         'd$v_c$ = ' + dv_c_str + dv_c_err_str + ' km/s',
                         lw=1, color=colors[i])
 
-                ax.vlines(x=self.init_values[i][3], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
-                #ax.axvline(self.best_values[i][3], color=colors[i], linestyle=':')       
+                ax.vlines(x=self.best_values[i][3], ymin=1.1, ymax=1.3, color=colors[i], lw=2)
 
         ax.plot(self.v, self.best_total_flux,
                 lw=1.5, color='red')
@@ -1295,14 +1308,13 @@ class ion(ion_transition):
             ion_transition = self.ion_transitions_list[i]
 
             # Generate fluxes for each component
-            best_comp_fluxes, best_total_flux = comp_model_spec_gen(ion_transition.v, ion_transition.best_values, 
+            best_total_flux = comp_model_spec_gen(ion_transition.v, ion_transition.best_values, 
                                                                     ion_transition.wav0_rest, 
                                                                     ion_transition.f, ion_transition.gamma, ion_transition.A,
                                                                     ion_transition.lsf_convolve, 
                                                                     ion_transition.lsf, ion_transition.v_lsf)
 
             # Set all these properties for the ion object
-            ion_transition.best_comp_fluxes = best_comp_fluxes
             ion_transition.best_total_flux = best_total_flux
 
     def plot_ion_best_fit(self, draw_masks=True, legend=True, label_axes=True, n_cols=2):
@@ -1598,10 +1610,9 @@ class ion(ion_transition):
                                             sample_values[param_names.index('it{}c{}_dv_c'.format(i+1, k+1))]])
 
 
-                sample_comp_fluxes, sample_total_flux = comp_model_spec_gen(ion_transition.v, sample_values_reshape, 
-                                                                    ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
-                                                                    ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
-
+                sample_total_flux = comp_model_spec_gen(ion_transition.v, sample_values_reshape, 
+                                                        ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
+                                                        ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
 
 
                 # Convert to array
@@ -1626,10 +1637,14 @@ class ion(ion_transition):
                         # Create dictionary of colors based on sorted centroids
                         colors_dict = {median_centroids_sort[i]:colors[i] for i in range(len(median_centroids_sort))}
 
-                    for q in range(len(sample_comp_fluxes)):
+                    for q in range(sample_values_reshape.shape[0]):
                         # Choose color given centroid
+                        sample_comp_flux = comp_model_spec_gen(ion_transition.v, [sample_values_reshape[q,:]], 
+                                                        ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
+                                                        ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
+                        
                         ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors_dict[sample_values_reshape[q][-1]], lw=2)
-                        ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors_dict[sample_values_reshape[q][-1]], lw=.8)
+                        ax.plot(ion_transition.v, sample_comp_flux, color=colors_dict[sample_values_reshape[q][-1]], lw=.8)
                 else:
                     # For MLE
                     self.params_mle_reshape.append(sample_values_reshape)
@@ -2057,9 +2072,9 @@ class ion_summary(ion_suite):
                                                     b_err_hi,
                                                     sample_values_errs_hi[param_names.index('it{}c{}_dv_c'.format(i+1, k+1))]])
 
-                    sample_comp_fluxes, sample_total_flux = comp_model_spec_gen(ion_transition.v, sample_values_reshape, 
-                                                                        ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
-                                                                        ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
+                    sample_total_flux = comp_model_spec_gen(ion_transition.v, sample_values_reshape, 
+                                                            ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
+                                                            ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)  
 
 
                     # Make into numpy array
@@ -2087,10 +2102,14 @@ class ion_summary(ion_suite):
                             # Create dictionary of colors based on sorted centroids
                             colors_dict = {median_centroids_sort[i]:colors[i] for i in range(len(median_centroids_sort))}
 
-                        for q in range(len(sample_comp_fluxes)):
+                        for q in range(sample_values_reshape.shape[0]):
                             # Choose color given centroid
+                            sample_comp_flux = comp_model_spec_gen(ion_transition.v, [sample_values_reshape[q,:]], 
+                                                            ion_transition.wav0_rest, ion_transition.f, ion_transition.gamma, ion_transition.A,
+                                                            ion_transition.lsf_convolve, ion_transition.lsf, ion_transition.v_lsf)
+                             
                             ax.vlines(x=sample_values_reshape[q][-1], ymin=1.1, ymax=1.3, color=colors_dict[sample_values_reshape[q][-1]], lw=1)
-                            ax.plot(ion_transition.v, sample_comp_fluxes[q], color=colors_dict[sample_values_reshape[q][-1]], lw=.5)
+                            ax.plot(ion_transition.v, sample_comp_flux, color=colors_dict[sample_values_reshape[q][-1]], lw=.5)
                         
                     else:
                         # For MLE
@@ -2202,9 +2221,8 @@ def gen_flux_def(v_mod, logN, b, wav0_rest, f, gamma):
     # Return the flux deficit
     return np.exp(-tau)
 
-def model_spec_gen(v_obs, params, 
-                   wav0_rest, f, gamma, A,
-                   lsf_convolve, lsf, v_lsf):
+def model_spec_gen(v_mod, params, 
+                   wav0_rest, f, gamma, A):
 
     '''
     Model to generate LSF convolved flux deficits
@@ -2228,39 +2246,12 @@ def model_spec_gen(v_obs, params,
         b = np.sqrt(2*k_B*10**logT/(A*amu) + b_NT**2)
 
     # Redifine shifted velocity
-    v_shift = v_obs - dv_c
+    v_shift = v_mod - dv_c
 
-    # Extend the velocity range beyond given for purposes of convolution
-
-    # First get LSF velocity pixel
-    delta_v_lsf = np.mean(v_lsf[1:]-v_lsf[:-1])
-
-    # Then, decide by how much you want to extend in each side
-    delta_v_extend = len(lsf)*delta_v_lsf
-
-    # Resample the wavelengths with some padding
-    #print(v_shift, delta_v_extend, delta_v_lsf)
-    v_mod = np.arange(v_shift[0]-delta_v_extend, v_shift[-1]+delta_v_extend, delta_v_lsf)
-    
     # Generate model spectrum
-    f_v_norm_mod = gen_flux_def(v_mod, logN, b, wav0_rest, f, gamma)
+    f_v_norm_mod = gen_flux_def(v_shift, logN, b, wav0_rest, f, gamma)
 
-    if lsf_convolve == True:
-
-        # First perform the convolution
-        f_v_mod_conv = np.convolve(f_v_norm_mod, lsf, mode='valid')
-
-        # Get the velocity pixels for the convolution
-        v_mod_conv = v_mod[np.argmax(np.flip(lsf)):np.argmax(np.flip(lsf))+len(f_v_mod_conv)]
-
-        # Interpolate the convoluted model
-        f_v_mod_interp = np.interp(v_obs, v_mod_conv+dv_c, f_v_mod_conv)
-
-    else:
-        f_v_mod_interp = np.interp(v_obs, v_mod+dv_c, f_v_norm_mod)
-    
-    return f_v_mod_interp
-
+    return f_v_norm_mod
 
 def comp_model_spec_gen(v_obs, params_list, 
                    wav0_rest, f, gamma, A,
@@ -2269,23 +2260,41 @@ def comp_model_spec_gen(v_obs, params_list,
     # Get number of components
     n_components = len(params_list)
 
+    # Model spectrum velocities
+    delta_v_lsf = np.mean(v_lsf[1:]-v_lsf[:-1])
+    v_mod = np.arange(v_obs[0]-2*len(lsf)*delta_v_lsf,v_lsf[-1]+2*len(lsf)*delta_v_lsf,delta_v_lsf)
+
     # Generate fluxes for each component
-    component_fluxes = np.zeros((n_components, len(v_obs)))
+    component_fluxes = np.zeros((n_components, len(v_mod)))
 
     for i in range(n_components):
 
         params = params_list[i]
 
-        component_fluxes[i,:] = model_spec_gen(v_obs, params, 
-                                               wav0_rest, f, gamma, A,
-                                               lsf_convolve, lsf, v_lsf)
+        component_fluxes[i,:] = model_spec_gen(v_mod, params, 
+                   wav0_rest, f, gamma, A)
         
 
     # Generate the best fit model itself - it's the product of all components, NOT the sum
     # This is because optical depths can add, that corresponds to multiplying flux deficits
-    best_fit_flux = np.prod(component_fluxes, axis=0)
+    total_flux_mod = np.prod(component_fluxes, axis=0)
 
-    return component_fluxes, best_fit_flux
+    if lsf_convolve == True:
+
+        # First perform the convolution of the signal
+        total_flux_mod_conv = np.convolve(total_flux_mod, lsf, mode='valid')
+
+        # Get x-coordinates corresponding to convolution
+        # This is basically a moving average
+        # Why do we need this offset?
+        v_mod_conv = np.convolve(v_mod, np.ones(len(lsf)), mode='valid')/len(lsf)
+        #v_mod_conv = v_mod_conv-delta_v_lsf
+
+        total_flux_interp = np.interp(v_obs, v_mod_conv, total_flux_mod_conv)
+    else:
+        total_flux_interp = np.interp(v_obs, v_mod, total_flux_mod)
+  
+    return total_flux_interp
 
 def log_to_linear_PDF(flatchain, bins=250):
 
@@ -2354,7 +2363,7 @@ def weighted_residuals(params, ion_transitions_list, method, exclude_models, var
         resid = (ion_transition.flux_norm_mask - comp_model_spec_gen(ion_transition.v_mask, params_list_reshape, 
                                                     ion_transition.wav0_rest, ion_transition.f,ion_transition.gamma,ion_transition.A,
                                                     ion_transition.lsf_convolve,
-                                                    ion_transition.lsf, ion_transition.v_lsf)[1])/ion_transition.err_norm_mask
+                                                    ion_transition.lsf, ion_transition.v_lsf))/ion_transition.err_norm_mask
 
         resid_list.append(resid)
 

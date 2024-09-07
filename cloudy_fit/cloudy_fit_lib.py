@@ -694,8 +694,8 @@ def gen_logN_ratio_str(logN_str_1, logN_str_2, non_det_err=0.3):
     
     # Relevant quantities
     logN_ratio = coord_value_logN1-coord_value_logN2
-    err_lo_logN_ratio = -np.sqrt(err_lo_logN1**2 + err_lo_logN2**2) # Put negative sign for consistency w/ plotting functions
-    err_hi_logN_ratio = np.sqrt(err_hi_logN1**2 + err_hi_logN2**2)  
+    err_lo_logN_ratio = -np.sqrt(err_lo_logN1**2 + err_hi_logN2**2) # Put negative sign for consistency w/ plotting functions
+    err_hi_logN_ratio = np.sqrt(err_hi_logN1**2 + err_lo_logN2**2)  
     
     # Classify cases as booleans
         
@@ -892,8 +892,8 @@ def log_likelihood_hdens(log_hdens, logN_ratio_dict, species_logN_interp):
             # Observed column density
             y = logN_ratio_arr[0]
 
-            # Use max of lower and upper error for defining Gaussian distribution of column density
-            sig_y = max(-logN_ratio_arr[1], logN_ratio_arr[2])
+            # Use avg. of lower and upper error for defining Gaussian distribution of column density
+            sig_y = .5*(-logN_ratio_arr[1]+logN_ratio_arr[2]) # max(-logN_ratio_arr[1], logN_ratio_arr[2])
 
             # Gaussian likelihood
             ll += -.5*(y-y_bar)**2/sig_y**2
@@ -1027,8 +1027,8 @@ def log_likelihood(params, logN_dict, species_logN_interp):
             # Observed column density
             y = logN_arr[0]
 
-            # Use max of lower and upper error for defining Gaussian distribution of column density
-            sig_y = max(-logN_arr[1], logN_arr[2])
+            # Use avg. of lower and upper error for defining Gaussian distribution of column density
+            sig_y = .5*(-logN_arr[1]+logN_arr[2])  #max(-logN_arr[1], logN_arr[2])
 
             # Gaussian likelihood
             ll += -.5*(y-y_bar)**2/sig_y**2
@@ -1182,8 +1182,8 @@ def log_likelihood_two_phase(params, logN_dict, species_logN_interp):
             # Observed column density
             y = logN_arr[0]
 
-            # Use max of lower and upper error for defining Gaussian distribution of column density
-            sig_y = max(-logN_arr[1], logN_arr[2])
+            # Use avg of lower and upper error for defining Gaussian distribution of column density
+            sig_y = .5*(-logN_arr[1]+logN_arr[2]) # max(-logN_arr[1], logN_arr[2])
 
             # Gaussian likelihood
             ll += -.5*(y-y_bar)**2/sig_y**2
@@ -1345,8 +1345,8 @@ def log_likelihood_three_phase(params, logN_dict, species_logN_interp):
             # Observed column density
             y = logN_arr[0]
 
-            # Use max of lower and upper error for defining Gaussian distribution of column density
-            sig_y = max(-logN_arr[1], logN_arr[2])
+            # Use avg. of lower and upper error for defining Gaussian distribution of column density
+            sig_y = .5*(-logN_arr[1] + logN_arr[2]) # max(-logN_arr[1], logN_arr[2])
 
             # Gaussian likelihood
             ll += -.5*(y-y_bar)**2/sig_y**2
