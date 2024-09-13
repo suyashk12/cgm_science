@@ -2286,9 +2286,7 @@ def comp_model_spec_gen(v_obs, params_list,
 
         # Get x-coordinates corresponding to convolution
         # This is basically a moving average
-        # Why do we need this offset?
         v_mod_conv = np.convolve(v_mod, np.ones(len(lsf)), mode='valid')/len(lsf)
-        #v_mod_conv = v_mod_conv-delta_v_lsf
 
         total_flux_interp = np.interp(v_obs, v_mod_conv, total_flux_mod_conv)
     else:
