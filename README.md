@@ -14,13 +14,13 @@ Codes for analyzing the kinematics, chemistry, and thermodynamics of the circumg
 
 3. Indirect gas detection routines - for identifying properties of gas far away from the galactic center of galaxies identified above. Relevant folder -
 
-  a. voigt_fit - for making direct measurements from Hubble Space Telescope and Keck Telescope data. Includes MCMC uncertainty measurements
+   a. voigt_fit - for making direct measurements from Hubble Space Telescope and Keck Telescope data. Includes MCMC uncertainty measurements
 
-  b. lsf_transform - for incorporating telescope properties in measurements above
+   b. lsf_transform - for incorporating telescope properties in measurements above
 
-  c. upper_limits - statistical framework for including undetected features in analysis
+   c. upper_limits - statistical framework for including undetected features in analysis
 
-  d. velocity_stacks - composite panels made for proposals
+   d. velocity_stacks - composite panels made for proposals
 
 4. Simulation routines - for comparing measurements from data with a simulation grid and infer gas properties like chemistry and thermodynamics. Relevant folders -
 
