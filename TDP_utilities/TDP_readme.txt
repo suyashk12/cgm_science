@@ -42,10 +42,14 @@ More recent versions are available. Note that the atomic physics may vary betwee
 
 Make sure you can run basic scripts like the Smoke Test (https://gitlab.nublado.org/cloudy/cloudy/-/wikis/Smoke%20Test) 
 as well as scripts in Hazy1 (available under c2x.xx/docs/hazy1.pdf under your installed CLOUDY folder). 
+
+-- Add a note about .sh and .in files
+
 The general principle for running a script is to first save it as “x.in”, where x is your script name, 
 and also have a shell script file in the same folder (see run.sh in https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/run.sh). 
 Be sure to modify the path in run.sh to the location where you have installed CLOUDY.
 The script will then be run using the command "./run.sh x" in the Command Line (make sure you are in the same folder as your script when executing this command). 
+Please not that you will have to provide your shell script file with appropriate permissions to make it executable. This is done through the command "chmod u+x run.sh".
 The script may save output (with extensions of “.out”, etc.) in the folder where the script was executed. 
 
 :::::::::::::::::::::
@@ -101,6 +105,8 @@ can locate these files because they will be parsed in the next step!
 ::::::::::::::::::::::::::::::::::::::::::::::
 : Parsing and interpolating the output files : 
 ::::::::::::::::::::::::::::::::::::::::::::::
+
+-- Add a note about requiring cloudy_fit.py
 
 Having obtained ion fractions for each grid point, you can use the notebook 
 "TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to parse the output of CLOUDY scripts
