@@ -1,0 +1,21 @@
+coronal 3e6 K init time
+hden 0.1 linear
+metal -0.5 log
+set dr 0
+set nend 1
+stop zone 1
+iterate 300
+stop time when temperature falls below 1e4 K
+#
+# commands controlling output =========
+set cumulative mass
+set trimming off
+set save prefix "TDC_isochoric_frac"
+save time dependent ".tim" no hash
+save element hydrogen ".hyd" no hash
+save element oxygen ".oxy" no hash
+save element carbon ".carb" no hash
+save element nitrogen ".nit" no hash
+save cooling each ".cool" no hash
+save gammas ".heat" no hash
+        

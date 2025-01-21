@@ -1,0 +1,24 @@
+cmb z=1
+table hm12 z=1
+coronal 3e6 K init time
+hden -3.24 log
+metal -0.5 log
+set dr 0
+set nend 1
+stop zone 1
+iterate 400
+stop time when temperature falls below 1e4 K
+double  ## mimic two-sided photoionization
+#
+# commands controlling output =========
+set cumulative mass
+set trimming off
+set save prefix "cd-cool-1keV"
+save time dependent ".tim" no hash
+save element hydrogen ".hyd" no hash
+save element oxygen ".oxy" no hash
+save element carbon ".carb" no hash
+save element nitrogen ".nit" no hash
+save cooling ".cool" no hash
+save gammas ".gam" no hash
+                    
