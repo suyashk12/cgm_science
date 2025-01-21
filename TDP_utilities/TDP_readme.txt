@@ -108,14 +108,13 @@ into compilation errors in the next step.
 : Parsing and interpolating the output files : 
 ::::::::::::::::::::::::::::::::::::::::::::::
 
--- Add a note about requiring cloudy_fit.py
-
 Having obtained ion fractions for each grid point, you can use the notebook 
 "TDP_grid_compile.ipynb" (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid_compile.ipynb) to parse the output of CLOUDY scripts
 run for individual grid points. Make sure to set rootdir to the location where ".elem" files from the previous step were saved, and that the specified
 grids for density and metallicity are consistent with that specified in "TDP_scripts_write.ipynb" (you cannot parse what you did not create!).
 I store the ion fraction grid as a "pickle" file (.pkl, https://docs.python.org/3/library/pickle.html). This way, when comparing TDP models with 
 measurements (see next step), the grid of ion fractions can be loaded as a dictionary "d", where fractions for an ionic species "X" can be accessed using d[X].
+For reference, I am including the final .pkl files for ion fractions and cooling efficiencies (but not the intermediate files since they have a large volume).
 Also please note that to successfully execute the compilation notebook, you will require some of the functionalities defined in cloudy_fit.py.
 So please ensure that the Python script file is in the same folder as your Jupyter notebook to avoid any issues!
 
