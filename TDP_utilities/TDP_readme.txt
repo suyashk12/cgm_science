@@ -114,9 +114,13 @@ run for individual grid points. Make sure to set rootdir to the location where "
 grids for density and metallicity are consistent with that specified in "TDP_scripts_write.ipynb" (you cannot parse what you did not create!).
 I store the ion fraction grid as a "pickle" file (.pkl, https://docs.python.org/3/library/pickle.html). This way, when comparing TDP models with 
 measurements (see next step), the grid of ion fractions can be loaded as a dictionary "d", where fractions for an ionic species "X" can be accessed using d[X].
-For reference, I am including the final .pkl files for ion fractions and cooling efficiencies (but not the intermediate files since they have a large volume).
-Also please note that to successfully execute the compilation notebook, you will require some of the functionalities defined in cloudy_fit.py.
+Please note that to successfully execute the compilation notebook, you will require some of the functionalities defined in cloudy_fit.py.
 So please ensure that the Python script file is in the same folder as your Jupyter notebook to avoid any issues!
+
+For reference, I am including the final .pkl files for ion fractions (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid.pkl)
+and cooling efficiencies (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_cool.pkl) from running CLOUDY scripts on this sparse grid.
+I am not including the intermediate .elem or .out files since they have a large volume and are not suitable for hosting on GitHub. If you'd like pickle files
+for a denser grid, please check out the Google Drive link included at the top of this tutorial!
 
 :::::::::::::::::::::::::::::::
 : Comparing with observations :
