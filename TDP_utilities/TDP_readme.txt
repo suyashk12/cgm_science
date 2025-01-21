@@ -5,7 +5,7 @@ UVB background, which provides additional photoionization and photoheating.
 
 Available TDP models use the extragalactic UVB prescription from HM05 (Haardt and Madau 2001),
 or HM12 (Haardt and Madau 2012). However, latest updates to the UVB from KS19 (Khaire and Srianand 2019)
-and FG20 (Faucher-Giguere 2020) have not been incorporated under a TDP framework. Kumar et al. 2024b (in prep)
+and FG20 (Faucher-Giguere 2020) have not been incorporated under a TDP framework. Kumar et al. 2025
 consider TDP fractions under the KS19 and FG20 UVBs, as well as compare TDP models with absorption line measurements.
 
 If you would like to use the exact a TDP grid using FG20 at z=1, you can download it here -
@@ -132,7 +132,7 @@ For reference, I am including the final .pkl files for ion fractions
 (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_grid.pkl)
 and cooling efficiencies (https://github.com/suyashk12/cgm_science/blob/main/TDP_utilities/TDP_cool.pkl) from 
 running CLOUDY scripts on a sparse grid. I am not including the intermediate .elem or .out files since they 
-have a large volume and are not suitable for hosting on GitHub. If you'd like pickle files for a denser grid, 
+have a large volume and cannot be hosted on GitHub. If you'd like pickle files for a denser grid, 
 please check out the Google Drive link included at the top of this tutorial.
 
 :::::::::::::::::::::::::::::::
